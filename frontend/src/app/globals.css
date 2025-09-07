@@ -1,0 +1,474 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark theme (default) */
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 142 76% 36%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 142 76% 36%;
+    --muted-foreground: 210 40% 98%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 142 76% 36%;
+    --input: 142 76% 36%;
+    --ring: 224.3 76.3% 94.1%;
+    --radius: 0.75rem;
+
+    /* Custom theme variables with high contrast */
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --glass-hover: rgba(255, 255, 255, 0.15);
+    --gradient-from: #0f172a;
+    --gradient-via: #581c87;
+    --gradient-to: #0f172a;
+    --text-primary: #ffffff;
+    --text-secondary: #f8fafc;
+    --text-muted: #e2e8f0;
+
+    /* Dark mode dropdown and form fixes */
+    --dropdown-bg: rgba(15, 23, 42, 0.95);
+    --dropdown-border: rgba(255, 255, 255, 0.2);
+    --dropdown-text: #f8fafc;
+    --dropdown-hover: rgba(30, 41, 59, 0.8);
+  }
+
+  .light {
+    /* Light theme - True light mode with excellent readability */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+
+    /* Light mode specific variables - True light theme */
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --glass-hover: rgba(248, 250, 252, 1);
+    --gradient-from: #ffffff;
+    --gradient-via: #f8fafc;
+    --gradient-to: #f1f5f9;
+    --text-primary: #111827;
+    --text-secondary: #374151;
+    --text-muted: #6b7280;
+    --text-readable: #374151;
+    --text-high-contrast: #111827;
+
+    /* Light mode form and interactive elements */
+    --dropdown-bg: #ffffff;
+    --dropdown-border: rgba(0, 0, 0, 0.2);
+    --dropdown-text: #111827;
+    --dropdown-hover: #f9fafb;
+
+    /* Button styling for light mode */
+    --button-primary-bg: #3b82f6;
+    --button-primary-text: #ffffff;
+    --button-secondary-bg: #f3f4f6;
+    --button-secondary-text: #374151;
+    --button-hover-bg: #2563eb;
+
+    /* Background variations */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --bg-tertiary: #f3f4f6;
+    --bg-accent: #eff6ff;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background: linear-gradient(135deg, var(--gradient-from), var(--gradient-via), var(--gradient-to));
+    min-height: 100vh;
+    color: var(--text-primary);
+  }
+
+  .text-primary {
+    color: var(--text-primary);
+  }
+
+  .text-secondary {
+    color: var(--text-secondary);
+  }
+
+  .text-muted {
+    color: var(--text-muted);
+  }
+
+  /* High contrast text utilities */
+  .text-high-contrast {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+  }
+
+  .text-readable {
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+  }
+
+  /* Enhanced light mode utilities */
+  .bg-light-primary {
+    background-color: var(--bg-primary);
+  }
+
+  .bg-light-secondary {
+    background-color: var(--bg-secondary);
+  }
+
+  .bg-light-tertiary {
+    background-color: var(--bg-tertiary);
+  }
+
+  .bg-light-accent {
+    background-color: var(--bg-accent);
+  }
+
+  /* Enhanced form styling for light mode */
+  .light input,
+  .light select,
+  .light textarea {
+    background-color: #ffffff !important;
+    border-color: #d1d5db !important;
+    color: #111827 !important;
+  }
+
+  .light input:focus,
+  .light select:focus,
+  .light textarea:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+  }
+
+  /* Enhanced button styling for light mode */
+  .light .glass-button {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    color: #374151 !important;
+  }
+
+  .light .glass-button:hover {
+    background: rgba(248, 250, 252, 1) !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+    color: #111827 !important;
+  }
+
+  .text-subtitle {
+    color: var(--text-muted) !important;
+    font-weight: 400;
+  }
+
+  /* Force dark text in light mode */
+  [data-theme="light"] .text-primary,
+  [data-theme="light"] .text-high-contrast {
+    color: #0f172a !important;
+  }
+
+  [data-theme="light"] .text-secondary,
+  [data-theme="light"] .text-readable {
+    color: #1e293b !important;
+  }
+
+  [data-theme="light"] .text-muted,
+  [data-theme="light"] .text-subtitle {
+    color: #475569 !important;
+  }
+
+  /* Ensure all text elements are readable in light mode */
+  [data-theme="light"] h1,
+  [data-theme="light"] h2,
+  [data-theme="light"] h3,
+  [data-theme="light"] h4,
+  [data-theme="light"] h5,
+  [data-theme="light"] h6,
+  [data-theme="light"] p,
+  [data-theme="light"] span,
+  [data-theme="light"] div {
+    color: #0f172a;
+  }
+
+  [data-theme="light"] .text-gray-300,
+  [data-theme="light"] .text-gray-400,
+  [data-theme="light"] .text-gray-500 {
+    color: #475569 !important;
+  }
+}
+
+/* Modern glassmorphism styles with enhanced rounded corners */
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .glass-card {
+    @apply glass shadow-2xl;
+    border-radius: 24px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  }
+
+  .glass-button {
+    @apply glass px-4 py-2 transition-all duration-300;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .glass-button:hover {
+    background: var(--glass-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent;
+    /* Fallback for browsers that don't support bg-clip-text */
+    color: var(--text-primary);
+    background: linear-gradient(135deg, #60a5fa, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Modern rounded elements */
+  .rounded-modern {
+    border-radius: 20px;
+  }
+
+  .rounded-modern-lg {
+    border-radius: 24px;
+  }
+
+  .rounded-modern-xl {
+    border-radius: 32px;
+  }
+
+  /* Enhanced shadows */
+  .shadow-modern {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  }
+
+  .shadow-modern-lg {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Smooth transitions */
+  .transition-modern {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+  }
+  
+  .neon-glow {
+    @apply shadow-lg shadow-blue-500/25;
+  }
+  
+  .subject-core {
+    @apply bg-blue-500/20 border-blue-500/30;
+    color: var(--text-primary);
+  }
+
+  .subject-elective {
+    @apply bg-green-500/20 border-green-500/30;
+    color: var(--text-primary);
+  }
+
+  .subject-lab {
+    @apply bg-orange-500/20 border-orange-500/30;
+    color: var(--text-primary);
+  }
+
+  .subject-skill {
+    @apply bg-purple-500/20 border-purple-500/30;
+    color: var(--text-primary);
+  }
+
+  .subject-project {
+    @apply bg-red-500/20 border-red-500/30;
+    color: var(--text-primary);
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(155, 155, 155, 0.5);
+    border-radius: 20px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(155, 155, 155, 0.7);
+  }
+}
+
+/* Animation keyframes */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(59, 130, 246, 0.8);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Background patterns */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.bg-dots-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Loading spinner */
+.spinner {
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-left: 2px solid #3b82f6;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Enhanced Dropdown and Select Styling Fixes */
+select,
+select option,
+.dropdown-content,
+[role="listbox"],
+[role="option"] {
+  background-color: var(--dropdown-bg) !important;
+  color: var(--dropdown-text) !important;
+  border: 1px solid var(--dropdown-border) !important;
+  font-weight: 500 !important;
+}
+
+select:hover,
+select:focus,
+.dropdown-content:hover,
+[role="listbox"]:hover,
+[role="option"]:hover {
+  background-color: var(--dropdown-hover) !important;
+  border-color: var(--primary) !important;
+}
+
+/* Enhanced Input field fixes */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="time"],
+input[type="number"],
+input[type="search"],
+textarea {
+  background-color: var(--dropdown-bg) !important;
+  color: var(--dropdown-text) !important;
+  border: 1px solid var(--dropdown-border) !important;
+  font-weight: 500 !important;
+}
+
+input:focus,
+textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.8 !important;
+  font-weight: 400 !important;
+}
+
+/* Light mode specific overrides */
+[data-theme="light"] select,
+[data-theme="light"] select option,
+[data-theme="light"] input,
+[data-theme="light"] textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+[data-theme="light"] select:focus,
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #64748b !important;
+  opacity: 0.8 !important;
+}
