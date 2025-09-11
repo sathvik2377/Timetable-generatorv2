@@ -22,11 +22,61 @@ interface PersonalPreference {
   notes: string;
 }
 
+interface PersonalActivity {
+  id: string;
+  title: string;
+  description: string;
+  type: 'study' | 'exercise' | 'hobby' | 'work' | 'personal';
+  priority: 'high' | 'medium' | 'low';
+  duration: number; // in minutes
+  color: string;
+}
+
 export default function StudentEditTimetablePage() {
   const [viewMode, setViewMode] = useState<'official' | 'custom'>('official');
   const [isEditing, setIsEditing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [draggedItem, setDraggedItem] = useState<any>(null);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<{day: string, timeSlot: string} | null>(null);
+  const [personalActivities, setPersonalActivities] = useState<PersonalActivity[]>([
+    {
+      id: '1',
+      title: 'Study Session',
+      description: 'Review lecture notes and prepare for next class',
+      type: 'study',
+      priority: 'high',
+      duration: 60,
+      color: '#3B82F6'
+    },
+    {
+      id: '2',
+      title: 'Gym Workout',
+      description: 'Cardio and strength training',
+      type: 'exercise',
+      priority: 'medium',
+      duration: 90,
+      color: '#10B981'
+    },
+    {
+      id: '3',
+      title: 'Part-time Job',
+      description: 'Work at campus library',
+      type: 'work',
+      priority: 'high',
+      duration: 120,
+      color: '#F59E0B'
+    },
+    {
+      id: '4',
+      title: 'Club Meeting',
+      description: 'Computer Science Club weekly meeting',
+      type: 'hobby',
+      priority: 'medium',
+      duration: 60,
+      color: '#8B5CF6'
+    }
+  ]);
 
   // Official timetable (read-only from institution)
   const [officialTimetable, setOfficialTimetable] = useState<{ [day: string]: { [timeSlot: string]: TimetableSlot | null } }>({
@@ -134,15 +184,25 @@ export default function StudentEditTimetablePage() {
     setHasChanges(true);
   };
 
-  const addPersonalActivity = (day: string, timeSlot: string) => {
+  const openActivityModal = (day: string, timeSlot: string) => {
     if (!isEditing || viewMode === 'official') return;
+    setSelectedSlot({ day, timeSlot });
+    setShowActivityModal(true);
+  };
 
+  const addPersonalActivity = (activity: PersonalActivity) => {
+    if (!selectedSlot) return;
+
+    const { day, timeSlot } = selectedSlot;
     const newActivity: TimetableSlot = {
       id: `custom-${Date.now()}`,
-      subject: 'Personal Study',
-      teacher: 'Self',
-      room: 'Library/Home',
-      type: 'tutorial',
+      subject: activity.title,
+      teacher: 'Personal',
+      room: activity.type === 'study' ? 'Library/Study Room' :
+            activity.type === 'exercise' ? 'Gym/Sports Complex' :
+            activity.type === 'work' ? 'Workplace' :
+            activity.type === 'hobby' ? 'Club Room' : 'Personal Space',
+      type: activity.type === 'study' ? 'tutorial' : 'break',
       students: 1,
       isCustom: true
     };
@@ -151,6 +211,26 @@ export default function StudentEditTimetablePage() {
     newTimetable[day][timeSlot] = newActivity;
     setCustomTimetable(newTimetable);
     setHasChanges(true);
+    setShowActivityModal(false);
+    setSelectedSlot(null);
+  };
+
+  const createNewActivity = (title: string, description: string, type: PersonalActivity['type']) => {
+    const newActivity: PersonalActivity = {
+      id: Date.now().toString(),
+      title,
+      description,
+      type,
+      priority: 'medium',
+      duration: 60,
+      color: type === 'study' ? '#3B82F6' :
+             type === 'exercise' ? '#10B981' :
+             type === 'work' ? '#F59E0B' :
+             type === 'hobby' ? '#8B5CF6' : '#6B7280'
+    };
+
+    setPersonalActivities(prev => [...prev, newActivity]);
+    addPersonalActivity(newActivity);
   };
 
   const removeCustomActivity = (day: string, timeSlot: string) => {
@@ -193,14 +273,14 @@ export default function StudentEditTimetablePage() {
     const baseColors = {
       theory: 'bg-blue-100 border-blue-300 text-blue-800',
       practical: 'bg-green-100 border-green-300 text-green-800',
-      tutorial: 'bg-purple-100 border-purple-300 text-purple-800',
+      tutorial: 'bg-teal-100 border-teal-300 text-teal-800',
       break: 'bg-yellow-100 border-yellow-300 text-yellow-800'
     };
 
     const customColors = {
       theory: 'bg-blue-200 border-blue-400 text-blue-900',
       practical: 'bg-green-200 border-green-400 text-green-900',
-      tutorial: 'bg-purple-200 border-purple-400 text-purple-900',
+      tutorial: 'bg-teal-200 border-teal-400 text-teal-900',
       break: 'bg-yellow-200 border-yellow-400 text-yellow-900'
     };
 
@@ -210,7 +290,7 @@ export default function StudentEditTimetablePage() {
   const currentTimetable = getCurrentTimetable();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-cyan-900 to-slate-900 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
@@ -277,7 +357,7 @@ export default function StudentEditTimetablePage() {
                 onClick={() => setViewMode('custom')}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
                   viewMode === 'custom'
-                    ? 'bg-purple-500 text-white'
+                    ? 'bg-cyan-500 text-white'
                     : 'glass border-white/20 text-readable hover:bg-white/10'
                 }`}
               >
@@ -320,7 +400,7 @@ export default function StudentEditTimetablePage() {
               {viewMode === 'custom' && (
                 <div className="flex justify-between">
                   <span className="text-readable">Custom Changes:</span>
-                  <span className="text-purple-400 font-semibold">
+                  <span className="text-cyan-400 font-semibold">
                     {Object.values(customTimetable).reduce((total, day) => 
                       total + Object.values(day).filter(slot => slot?.isCustom).length, 0
                     )}
@@ -366,9 +446,9 @@ export default function StudentEditTimetablePage() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-3 bg-purple-500/20 border border-purple-500/30 rounded-lg"
+            className="mb-6 p-3 bg-cyan-500/20 border border-cyan-500/30 rounded-lg"
           >
-            <p className="text-purple-400 text-sm flex items-center gap-2">
+            <p className="text-cyan-400 text-sm flex items-center gap-2">
               <Edit3 className="h-4 w-4" />
               You have unsaved changes to your custom timetable. Don't forget to save!
             </p>
@@ -439,7 +519,7 @@ export default function StudentEditTimetablePage() {
                             >
                               {slot.isCustom && (
                                 <div className="absolute -top-1 -right-1">
-                                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                                  <div className="w-3 h-3 bg-cyan-500 rounded-full"></div>
                                 </div>
                               )}
 
@@ -478,10 +558,10 @@ export default function StudentEditTimetablePage() {
                             <div
                               className={`h-20 border-2 border-dashed rounded flex items-center justify-center transition-colors ${
                                 isEditing && viewMode === 'custom'
-                                  ? 'border-gray-300 text-gray-400 hover:border-purple-400 hover:text-purple-400 cursor-pointer'
+                                  ? 'border-gray-300 text-gray-400 hover:border-cyan-400 hover:text-cyan-400 cursor-pointer'
                                   : 'border-gray-200 text-gray-300'
                               }`}
-                              onClick={() => isEditing && viewMode === 'custom' && addPersonalActivity(day, timeSlot)}
+                              onClick={() => isEditing && viewMode === 'custom' && openActivityModal(day, timeSlot)}
                             >
                               {isEditing && viewMode === 'custom' ? (
                                 <>
@@ -513,7 +593,7 @@ export default function StudentEditTimetablePage() {
               <span className="text-sm text-readable">Practical</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-purple-100 border-2 border-purple-300 rounded"></div>
+              <div className="w-4 h-4 bg-teal-100 border-2 border-teal-300 rounded"></div>
               <span className="text-sm text-readable">Tutorial</span>
             </div>
             <div className="flex items-center gap-2">
@@ -521,7 +601,7 @@ export default function StudentEditTimetablePage() {
               <span className="text-sm text-readable">Break</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-cyan-500 rounded-full"></div>
               <span className="text-sm text-readable">Custom Activity</span>
             </div>
             <div className="flex items-center gap-2">
@@ -608,12 +688,139 @@ export default function StudentEditTimetablePage() {
                 <textarea
                   value={preferences.notes}
                   onChange={(e) => setPreferences({...preferences, notes: e.target.value})}
-                  className="w-full h-32 px-4 py-3 glass border border-white/20 rounded-lg text-high-contrast focus:ring-2 focus:ring-purple-500 focus:outline-none resize-none"
+                  className="w-full h-32 px-4 py-3 glass border border-white/20 rounded-lg text-high-contrast focus:ring-2 focus:ring-cyan-500 focus:outline-none resize-none"
                   placeholder="Add your study goals, preferences, or any notes about your schedule..."
                 />
               </div>
             </div>
           </motion.div>
+        )}
+
+        {/* Personal Activity Modal */}
+        {showActivityModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white p-6">
+                <h2 className="text-2xl font-bold mb-2">Add Personal Activity</h2>
+                <p className="text-cyan-100">
+                  {selectedSlot && `${selectedSlot.day} at ${selectedSlot.timeSlot}`}
+                </p>
+              </div>
+
+              <div className="p-6 max-h-96 overflow-y-auto">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Choose from your activities:
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    {personalActivities.map(activity => (
+                      <button
+                        key={activity.id}
+                        onClick={() => addPersonalActivity(activity)}
+                        className="p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-cyan-400 transition-colors text-left"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-semibold text-gray-900 dark:text-white">
+                              {activity.title}
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-300">
+                              {activity.description}
+                            </div>
+                            <div className="flex items-center space-x-2 mt-2">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                activity.type === 'study' ? 'bg-blue-100 text-blue-800' :
+                                activity.type === 'exercise' ? 'bg-green-100 text-green-800' :
+                                activity.type === 'work' ? 'bg-yellow-100 text-yellow-800' :
+                                activity.type === 'hobby' ? 'bg-teal-100 text-teal-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {activity.type}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {activity.duration} min
+                              </span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                activity.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                activity.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                              }`}>
+                                {activity.priority}
+                              </span>
+                            </div>
+                          </div>
+                          <div
+                            className="w-4 h-4 rounded-full"
+                            style={{ backgroundColor: activity.color }}
+                          />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Or create a new activity:
+                  </h3>
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      placeholder="Activity title"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 dark:bg-gray-700 dark:text-white"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          const title = (e.target as HTMLInputElement).value;
+                          if (title.trim()) {
+                            createNewActivity(title, '', 'study');
+                          }
+                        }
+                      }}
+                    />
+                    <div className="flex space-x-2">
+                      {(['study', 'exercise', 'work', 'hobby', 'personal'] as const).map(type => (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            const titleInput = document.querySelector('input[placeholder="Activity title"]') as HTMLInputElement;
+                            const title = titleInput?.value.trim();
+                            if (title) {
+                              createNewActivity(title, '', type);
+                            }
+                          }}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            type === 'study' ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' :
+                            type === 'exercise' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
+                            type === 'work' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
+                            type === 'hobby' ? 'bg-teal-100 text-teal-800 hover:bg-teal-200' :
+                            'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-700 p-6 flex justify-end space-x-4">
+                <button
+                  onClick={() => {
+                    setShowActivityModal(false);
+                    setSelectedSlot(null);
+                  }}
+                  className="px-6 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </div>
     </div>

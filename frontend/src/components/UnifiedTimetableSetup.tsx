@@ -221,71 +221,204 @@ export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedT
     setIsGenerating(true)
     try {
       const timetables: any = {}
-      
+      let totalBranches = branches.length
+      let processedBranches = 0
+
+      toast.success(`🚀 Starting timetable generation for ${totalBranches} branches...`)
+
       for (const branch of branches) {
+        toast.loading(`📚 Processing ${branch.name}...`, { id: `branch-${branch.code}` })
+
+        // Validate branch data
+        if (!branch.subjects || branch.subjects.length === 0) {
+          toast.error(`❌ No subjects found for ${branch.name}. Skipping...`, { id: `branch-${branch.code}` })
+          continue
+        }
+
+        if (!branch.teachers || branch.teachers.length === 0) {
+          toast.error(`❌ No teachers found for ${branch.name}. Skipping...`, { id: `branch-${branch.code}` })
+          continue
+        }
+
         for (let section = 1; section <= branch.numberOfSections; section++) {
           const sectionKey = `${branch.code}-Section-${section}`
-          
-          // Prepare data for optimization
-          const optimizationData = {
-            branches: [{ 
-              name: branch.name, 
-              code: branch.code, 
-              totalStudents: 40, 
-              sections: branch.numberOfSections, 
-              yearLevel: 3 
-            }],
-            teachers: branch.teachers.map(t => ({
-              name: t.name,
-              employeeId: t.employeeId,
-              email: t.email,
-              department: branch.name,
-              subjects: [t.subjectAssigned],
-              maxHoursPerDay: 6
-            })),
-            subjects: branch.subjects.map(s => ({
-              name: s.name,
-              code: s.code,
-              type: s.type,
-              credits: Math.ceil(s.hoursPerWeek / 2),
-              contactHours: s.hoursPerWeek,
+
+          try {
+            // Prepare data for optimization with enhanced validation
+            const optimizationData = {
+              branches: [{
+                name: branch.name,
+                code: branch.code,
+                totalStudents: branch.studentsPerSection || 40,
+                sections: branch.numberOfSections,
+                yearLevel: 3
+              }],
+              teachers: branch.teachers.map(t => ({
+                name: t.name || `Teacher-${Math.random().toString(36).substr(2, 5)}`,
+                employeeId: t.employeeId || `EMP-${Math.random().toString(36).substr(2, 5)}`,
+                email: t.email || `${t.name?.toLowerCase().replace(/\s+/g, '.')}@institution.edu`,
+                department: branch.name,
+                subjects: [t.subjectAssigned || branch.subjects[0]?.name || 'General Subject'],
+                maxHoursPerDay: 6,
+                availability: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+              })),
+              subjects: branch.subjects.map(s => ({
+                name: s.name || `Subject-${Math.random().toString(36).substr(2, 5)}`,
+                code: s.code || s.name?.substring(0, 3).toUpperCase() || 'SUB',
+                type: s.type || 'theory',
+                credits: Math.max(1, Math.ceil((s.hoursPerWeek || 3) / 2)),
+                contactHours: s.hoursPerWeek || 3,
+                branch: branch.name,
+                semester: instituteData.semester,
+                requiresLab: s.type === 'practical' || s.type === 'lab'
+              })),
+              rooms: [
+                {
+                  name: `${branch.code}-Room-1`,
+                  type: 'classroom' as const,
+                  capacity: branch.studentsPerSection || 40,
+                  equipment: ['Projector', 'Whiteboard'],
+                  branch: branch.name
+                },
+                {
+                  name: `${branch.code}-Lab-1`,
+                  type: 'lab' as const,
+                  capacity: Math.min(30, branch.studentsPerSection || 30),
+                  equipment: ['Computers', 'Lab Equipment'],
+                  branch: branch.name
+                },
+                {
+                  name: `${branch.code}-Room-2`,
+                  type: 'classroom' as const,
+                  capacity: branch.studentsPerSection || 40,
+                  equipment: ['Smart Board'],
+                  branch: branch.name
+                }
+              ],
+              preferences: {
+                startTime: '09:00',
+                endTime: '16:00',
+                lunchBreak: '13:00-14:00',
+                workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+                periodDuration: 60,
+                mandatoryLunchBreak: true
+              }
+            }
+
+            const result = generateOptimizedTimetable(optimizationData)
+
+            // Validate the generated result
+            if (!result || !result.schedule || Object.keys(result.schedule).length === 0) {
+              throw new Error('Generated timetable is empty or invalid')
+            }
+
+            timetables[sectionKey] = {
               branch: branch.name,
-              semester: instituteData.semester
-            })),
-            rooms: [
-              { name: `${branch.code}-Room-1`, type: 'classroom' as const, capacity: 40, equipment: [], branch: branch.name },
-              { name: `${branch.code}-Lab-1`, type: 'lab' as const, capacity: 30, equipment: [], branch: branch.name }
-            ],
-            preferences: {
-              startTime: '09:00',
-              endTime: '16:00',
-              lunchBreak: '13:00-14:00',
-              workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-              periodDuration: 60
+              branchCode: branch.code,
+              section: section,
+              schedule: result.schedule,
+              optimizationScore: result.optimizationScore || 75,
+              totalPeriods: result.totalPeriods || 0,
+              conflictsResolved: result.conflictsResolved || 0,
+              branchSchedules: result.branchSchedules || {},
+              sectionSchedules: result.sectionSchedules || {},
+              colorMapping: result.colorMapping || {},
+              generatedAt: new Date().toISOString(),
+              studentsCount: branch.studentsPerSection || 40,
+              subjectsCount: branch.subjects.length,
+              teachersCount: branch.teachers.length
+            }
+
+            toast.success(`✅ Section ${section} completed for ${branch.name}`, { id: `section-${sectionKey}` })
+
+          } catch (sectionError) {
+            console.error(`Error generating timetable for ${sectionKey}:`, sectionError)
+            toast.error(`❌ Failed to generate timetable for ${branch.name} Section ${section}`)
+
+            // Create a fallback timetable
+            timetables[sectionKey] = {
+              branch: branch.name,
+              branchCode: branch.code,
+              section: section,
+              schedule: createFallbackSchedule(branch),
+              optimizationScore: 60,
+              totalPeriods: 15,
+              conflictsResolved: 0,
+              error: sectionError.message,
+              generatedAt: new Date().toISOString(),
+              studentsCount: branch.studentsPerSection || 40,
+              subjectsCount: branch.subjects.length,
+              teachersCount: branch.teachers.length
             }
           }
-          
-          const result = generateOptimizedTimetable(optimizationData)
-          timetables[sectionKey] = {
-            branch: branch.name,
-            section: section,
-            schedule: result.schedule,
-            optimizationScore: result.optimizationScore,
-            totalPeriods: result.totalPeriods,
-            conflictsResolved: result.conflictsResolved
-          }
         }
+
+        processedBranches++
+        toast.success(`✅ ${branch.name} completed (${processedBranches}/${totalBranches})`, { id: `branch-${branch.code}` })
       }
-      
+
       setGeneratedTimetables(timetables)
-      toast.success('Timetables generated successfully!')
+
+      const totalTimetables = Object.keys(timetables).length
+      const successfulTimetables = Object.values(timetables).filter((t: any) => !t.error).length
+
+      if (successfulTimetables === totalTimetables) {
+        toast.success(`🎉 All ${totalTimetables} timetables generated successfully!`)
+      } else {
+        toast.success(`⚠️ Generated ${successfulTimetables}/${totalTimetables} timetables (${totalTimetables - successfulTimetables} with fallbacks)`)
+      }
+
       setCurrentStep(5) // Move to review step
     } catch (error) {
       console.error('Timetable generation error:', error)
-      toast.error('Failed to generate timetables. Please check your data.')
+      toast.error('❌ Failed to generate timetables. Please check your data and try again.')
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  // Create a fallback schedule when optimization fails
+  const createFallbackSchedule = (branch: BranchData) => {
+    const schedule: Record<string, Record<string, any>> = {}
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+    const timeSlots = ['09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '14:00-15:00', '15:00-16:00']
+
+    days.forEach(day => {
+      schedule[day] = {}
+      timeSlots.forEach((timeSlot, index) => {
+        if (timeSlot !== '13:00-14:00') { // Skip lunch
+          const subject = branch.subjects[index % branch.subjects.length]
+          const teacher = branch.teachers[index % branch.teachers.length]
+
+          schedule[day][timeSlot] = {
+            subject: subject?.name || 'General Subject',
+            teacher: teacher?.name || 'Faculty',
+            room: `${branch.code}-Room-${(index % 2) + 1}`,
+            branch: branch.name,
+            section: '1',
+            type: subject?.type || 'theory',
+            students: branch.studentsPerSection || 40,
+            subjectCode: subject?.code || 'GEN',
+            color: '#6B7280'
+          }
+        }
+      })
+
+      // Add lunch break
+      schedule[day]['13:00-14:00'] = {
+        subject: 'Lunch Break',
+        teacher: '',
+        room: 'Cafeteria',
+        branch: branch.name,
+        section: '1',
+        type: 'break',
+        students: 0,
+        isBreak: true,
+        color: '#10B981'
+      }
+    })
+
+    return schedule
   }
 
   const nextStep = () => {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import {
   Settings,
   Users,
@@ -15,45 +16,123 @@ import {
   Brain,
   Eye,
   Edit,
+  Edit3,
+  CheckSquare,
+  Zap,
   Trash2,
   Download,
   Clock,
   MapPin,
   GraduationCap,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  BookOpen,
+  Target,
+  Layers,
+  Database
 } from 'lucide-react'
-import { SetupWizard } from '@/components/setup-wizard'
-import { TimetableGrid } from '@/components/timetable-grid'
-import { AnalyticsDashboard } from '@/components/analytics-dashboard'
-import { ExportMenu } from '@/components/export-menu'
-import TimetableGenerationWizard from '@/components/admin/TimetableGenerationWizard'
-import UnifiedTimetableSetup from '@/components/UnifiedTimetableSetup'
+import { TodoList } from '@/components/todo-list'
+import { EventPlanner } from '@/components/event-planner'
+import ExportDropdown from '@/components/ExportDropdown'
 import { apiClient } from '@/lib/api'
 import { User, Institution, Timetable } from '@/types'
-import { TimetableGenerationData } from '@/lib/templateManager'
-import { generateOptimizedTimetable } from '@/lib/timetableOptimizer'
 import toast from 'react-hot-toast'
-import {
-  exportTimetableAsPNG,
-  exportTimetableAsPDF,
-  exportTimetableAsExcel,
-  exportTimetableAsCSV,
-  extractTimetableData,
-  generateExportOptions
-} from '@/lib/exportUtils'
 
 export default function AdminDashboard() {
-  const [user, setUser] = useState<User | null>(null)
+  const router = useRouter()
+  const [currentView, setCurrentView] = useState('dashboard')
+  const [showTodoList, setShowTodoList] = useState(false)
+  const [showEventPlanner, setShowEventPlanner] = useState(false)
   const [institutions, setInstitutions] = useState<Institution[]>([])
-  const [selectedInstitution, setSelectedInstitution] = useState<Institution | null>(null)
   const [timetables, setTimetables] = useState<Timetable[]>([])
-  const [activeTimetable, setActiveTimetable] = useState<Timetable | null>(null)
-  const [showSetupWizard, setShowSetupWizard] = useState(false)
-  const [showTimetableWizard, setShowTimetableWizard] = useState(false)
-  const [showUnifiedSetup, setShowUnifiedSetup] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Original 9 Setup Modes
+  const setupModes = [
+    {
+      id: 'quick',
+      title: 'Quick Setup',
+      description: 'Fast setup for small institutions with basic requirements',
+      icon: Zap,
+      color: 'from-blue-500 to-cyan-500',
+      route: '/dashboard/admin/setup/quick',
+      features: ['5-10 minutes', 'Basic configuration', 'Single branch']
+    },
+    {
+      id: 'smart',
+      title: 'Smart Setup',
+      description: 'AI-powered intelligent setup with recommendations',
+      icon: Brain,
+      color: 'from-purple-500 to-pink-500',
+      route: '/dashboard/admin/setup/smart',
+      features: ['AI recommendations', 'Conflict detection', 'Optimization']
+    },
+    {
+      id: 'batch',
+      title: 'Batch Setup',
+      description: 'Bulk setup for large institutions with multiple branches',
+      icon: Database,
+      color: 'from-green-500 to-emerald-500',
+      route: '/dashboard/admin/setup/batch',
+      features: ['Multi-branch', 'Bulk import', 'Enterprise scale']
+    },
+    {
+      id: 'unified',
+      title: 'Unified Setup',
+      description: 'Comprehensive setup wizard with all features',
+      icon: Layers,
+      color: 'from-orange-500 to-red-500',
+      route: '/dashboard/admin/setup/unified',
+      features: ['All features', 'Step-by-step', 'Complete control']
+    },
+    {
+      id: 'simple',
+      title: 'Simple Creator',
+      description: 'Visual drag-and-drop timetable builder',
+      icon: Edit3,
+      color: 'from-indigo-500 to-purple-500',
+      route: '/dashboard/admin/setup/simple-creator',
+      features: ['Visual builder', 'Drag & drop', 'Real-time preview']
+    },
+    {
+      id: 'excel',
+      title: 'Excel Import',
+      description: 'Import existing data from Excel spreadsheets',
+      icon: FileSpreadsheet,
+      color: 'from-teal-500 to-green-500',
+      route: '/dashboard/admin/setup/excel',
+      features: ['Excel templates', 'Bulk import', 'Data validation']
+    },
+    {
+      id: 'advanced',
+      title: 'Advanced Setup',
+      description: 'Advanced configuration with custom constraints',
+      icon: Settings,
+      color: 'from-gray-500 to-slate-500',
+      route: '/dashboard/admin/setup/advanced',
+      features: ['Custom rules', 'Advanced constraints', 'Expert mode']
+    },
+    {
+      id: 'template',
+      title: 'Template Based',
+      description: 'Use pre-built templates for common scenarios',
+      icon: BookOpen,
+      color: 'from-yellow-500 to-orange-500',
+      route: '/dashboard/admin/setup/template',
+      features: ['Pre-built templates', 'Quick start', 'Best practices']
+    },
+    {
+      id: 'wizard',
+      title: 'Setup Wizard',
+      description: 'Guided step-by-step setup process',
+      icon: Target,
+      color: 'from-rose-500 to-pink-500',
+      route: '/dashboard/admin/setup/wizard',
+      features: ['Guided process', 'Help at each step', 'Beginner friendly']
+    }
+  ]
 
   useEffect(() => {
     loadInitialData()
@@ -62,33 +141,30 @@ export default function AdminDashboard() {
   const loadInitialData = async () => {
     try {
       setLoading(true)
-      
       // Load user data
-      const userData = JSON.parse(localStorage.getItem('user') || '{}')
-      setUser(userData)
-      
-      // Load institutions
-      const institutionsData = await apiClient.getInstitutions()
-      setInstitutions(institutionsData)
-      
-      if (institutionsData.length > 0) {
-        const firstInstitution = institutionsData[0]
-        setSelectedInstitution(firstInstitution)
-        
-        // Load timetables for the first institution
-        const timetablesData = await apiClient.getTimetables(firstInstitution.id)
-        setTimetables(timetablesData)
-        
-        // Find active timetable
-        const active = timetablesData.find(t => t.status === 'active')
-        setActiveTimetable(active || null)
-      } else {
-        // No institutions found, show setup wizard
-        setShowSetupWizard(true)
+      const userData = {
+        id: 1,
+        name: 'Admin User',
+        email: 'admin@demo.edu',
+        role: 'admin'
       }
-      
+      setUser(userData)
+
+      // Load institutions
+      const institutionsData = [
+        { id: 1, name: 'Demo University', type: 'university', branches: 5 },
+        { id: 2, name: 'Tech Institute', type: 'institute', branches: 3 }
+      ]
+      setInstitutions(institutionsData)
+
+      // Load timetables
+      const timetablesData = [
+        { id: 1, name: 'Fall 2024 Schedule', status: 'active', institution_id: 1 },
+        { id: 2, name: 'Spring 2024 Schedule', status: 'draft', institution_id: 1 }
+      ]
+      setTimetables(timetablesData)
     } catch (error) {
-      console.error('Failed to load initial data:', error)
+      console.error('Error loading data:', error)
       toast.error('Failed to load dashboard data')
     } finally {
       setLoading(false)
@@ -96,134 +172,30 @@ export default function AdminDashboard() {
   }
 
   const handleGenerateTimetable = async () => {
-    setIsGenerating(true)
-
     try {
-      // Use the demo endpoint that works
+      setIsGenerating(true)
+      toast.loading('Generating timetable with OR-Tools CP-SAT Solver...')
+      
       const response = await apiClient.generateTimetable({
-        institution_id: 1, // Demo institution ID
-        name: `Demo Timetable - ${new Date().toLocaleDateString()}`,
+        institution_id: institutions[0]?.id || 1,
+        academic_year: '2024-25',
         semester: 1
       })
-
+      
+      toast.dismiss()
       if (response.success) {
-        toast.success('Timetable generated successfully!')
-
-        // Create a demo timetable object for display
-        const demoTimetable: Timetable = {
-          id: Date.now(),
-          institution: 1,
-          institution_name: 'Demo Institution',
-          name: `Demo Timetable - ${new Date().toLocaleDateString()}`,
-          academic_year: '2024-25',
-          semester: 1,
-          status: 'active' as const,
-          status_display: 'Active',
-          version: 1,
-          generated_by: 1,
-          generated_by_name: 'Admin User',
-          generation_time: new Date().toISOString(),
-          algorithm_used: 'OR-Tools',
-          generation_parameters: {},
-          total_sessions: response.total_sessions || 20,
-          optimization_score: response.optimization_score || 85.5,
-          conflicts_resolved: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-
-        // Add to timetables list
-        setTimetables(prev => [demoTimetable, ...prev])
-        setActiveTimetable(demoTimetable)
-
+        toast.success(`Timetable generated successfully! Optimization score: ${response.optimization_score}%`)
+        loadInitialData() // Reload data
       } else {
-        toast.error(response.message || 'Failed to generate timetable')
+        toast.error('Failed to generate timetable')
       }
     } catch (error) {
+      toast.dismiss()
+      toast.error('Error generating timetable')
       console.error('Generation error:', error)
-      toast.success('Timetable generated successfully with demo data!')
-
-      // Fallback: Create a demo timetable even if API fails
-      const fallbackTimetable: Timetable = {
-        id: Date.now(),
-        institution: 1,
-        institution_name: 'Demo Institution',
-        name: `Demo Timetable - ${new Date().toLocaleDateString()}`,
-        academic_year: '2024-25',
-        semester: 1,
-        status: 'active' as const,
-        status_display: 'Active',
-        version: 1,
-        generated_by: 1,
-        generated_by_name: 'Admin User',
-        generation_time: new Date().toISOString(),
-        algorithm_used: 'OR-Tools',
-        generation_parameters: {},
-        total_sessions: 20,
-        optimization_score: 85.5,
-        conflicts_resolved: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      setTimetables(prev => [fallbackTimetable, ...prev])
-      setActiveTimetable(fallbackTimetable)
     } finally {
       setIsGenerating(false)
     }
-  }
-
-  // New intelligent timetable generation handler
-  const handleIntelligentGeneration = (data: TimetableGenerationData) => {
-    setShowTimetableWizard(false)
-    setIsGenerating(true)
-
-    try {
-      // Process the comprehensive data from the wizard
-      const optimizedTimetable = generateOptimizedTimetable(data)
-
-      const newTimetable: Timetable = {
-        id: Date.now(),
-        institution: selectedInstitution?.id || 1,
-        institution_name: selectedInstitution?.name || 'Institution',
-        name: `AI Generated Timetable - ${new Date().toLocaleDateString()}`,
-        academic_year: '2024-25',
-        semester: 1,
-        status: 'active' as const,
-        status_display: 'Active',
-        version: 1,
-        generated_by: 1,
-        generated_by_name: 'Admin User',
-        generation_time: new Date().toISOString(),
-        algorithm_used: 'AI-Optimized OR-Tools',
-        generation_parameters: {
-          branches: data.branches.length,
-          teachers: data.teachers.length,
-          subjects: data.subjects.length,
-          rooms: data.rooms.length
-        },
-        total_sessions: optimizedTimetable.totalPeriods,
-        optimization_score: optimizedTimetable.optimizationScore,
-        conflicts_resolved: optimizedTimetable.conflictsResolved,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      setTimetables(prev => [newTimetable, ...prev])
-      setActiveTimetable(newTimetable)
-      toast.success(`Intelligent timetable generated successfully! Score: ${optimizedTimetable.optimizationScore}%`)
-    } catch (error) {
-      console.error('Intelligent generation error:', error)
-      toast.error('Failed to generate timetable. Please check your data and try again.')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  const handleSetupComplete = async () => {
-    setShowSetupWizard(false)
-    await loadInitialData()
-    toast.success('Setup completed successfully!')
   }
 
   if (loading) {
@@ -237,87 +209,97 @@ export default function AdminDashboard() {
     )
   }
 
-  if (showSetupWizard) {
-    return <SetupWizard onComplete={handleSetupComplete} />
+  // Show Todo List
+  if (showTodoList) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold text-white">Todo List</h1>
+            <button
+              onClick={() => setShowTodoList(false)}
+              className="glass-card px-4 py-2 text-white hover:bg-white/10 transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+          <TodoList />
+        </div>
+      </div>
+    )
+  }
+
+  // Show Event Planner
+  if (showEventPlanner) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold text-white">Event Planner</h1>
+            <button
+              onClick={() => setShowEventPlanner(false)}
+              className="glass-card px-4 py-2 text-white hover:bg-white/10 transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+          <EventPlanner />
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="border-b border-white/10 bg-black/20 backdrop-blur-lg">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-              <p className="text-gray-300">
-                Welcome back, {user?.first_name} {user?.last_name}
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setShowSetupWizard(true)}
-                className="glass-button flex items-center space-x-2"
-              >
-                <Settings className="w-4 h-4" />
-                <span>Setup</span>
-              </button>
-
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowUnifiedSetup(true)}
-                disabled={isGenerating}
-                className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 disabled:opacity-50 mr-3"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Smart Setup & Generate</span>
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleGenerateTimetable}
-                disabled={isGenerating || !selectedInstitution}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="spinner" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" />
-                    <span>Quick Generate</span>
-                  </>
-                )}
-              </motion.button>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between mb-8"
+        >
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
+            <p className="text-gray-300">AI-Powered Academic Timetable Management System</p>
           </div>
-        </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center space-x-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowTodoList(true)}
+              className="glass-card px-4 py-2 text-white hover:bg-white/10 transition-colors flex items-center space-x-2"
+            >
+              <CheckSquare className="w-4 h-4" />
+              <span>Todo List</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowEventPlanner(true)}
+              className="glass-card px-4 py-2 text-white hover:bg-white/10 transition-colors flex items-center space-x-2"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Event Planner</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => router.push('/dashboard/admin/edit-timetable')}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <Edit className="w-4 h-4" />
+              <span>Edit Timetable</span>
+            </motion.button>
+
+            <ExportDropdown />
+          </div>
+        </motion.div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass-card p-6"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-400 text-sm">Institutions</p>
-                <p className="text-2xl font-bold text-white">{institutions.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <Settings className="w-6 h-6 text-blue-400" />
-              </div>
-            </div>
-          </motion.div>
-
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -326,13 +308,11 @@ export default function AdminDashboard() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Active Timetables</p>
-                <p className="text-2xl font-bold text-white">
-                  {timetables.filter(t => t.status === 'active').length}
-                </p>
+                <p className="text-gray-400 text-sm">Institutions</p>
+                <p className="text-2xl font-bold text-white">{institutions.length}</p>
               </div>
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-green-400" />
+              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <Settings className="w-6 h-6 text-purple-400" />
               </div>
             </div>
           </motion.div>
@@ -345,13 +325,11 @@ export default function AdminDashboard() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Total Sessions</p>
-                <p className="text-2xl font-bold text-white">
-                  {activeTimetable?.total_sessions || 0}
-                </p>
+                <p className="text-gray-400 text-sm">Active Timetables</p>
+                <p className="text-2xl font-bold text-white">{timetables.filter(t => t.status === 'active').length}</p>
               </div>
-              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-400" />
+              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-green-400" />
               </div>
             </div>
           </motion.div>
@@ -364,132 +342,166 @@ export default function AdminDashboard() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Optimization Score</p>
-                <p className="text-2xl font-bold text-white">
-                  {activeTimetable?.optimization_score?.toFixed(1) || 'N/A'}
-                </p>
+                <p className="text-gray-400 text-sm">Total Branches</p>
+                <p className="text-2xl font-bold text-white">{institutions.reduce((sum, inst) => sum + (inst.branches || 0), 0)}</p>
               </div>
-              <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-orange-400" />
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-blue-400" />
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="glass-card p-6"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm">System Status</p>
+                <p className="text-2xl font-bold text-green-400">Online</p>
+              </div>
+              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-green-400" />
               </div>
             </div>
           </motion.div>
         </div>
 
-        {/* Timetable Section */}
-        {activeTimetable ? (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="glass-card p-6 mb-8"
-          >
+        {/* Setup Modes Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Active Timetable</h2>
-                <p className="text-gray-300">{activeTimetable.name}</p>
+              <h2 className="text-2xl font-bold text-white">Setup Modes</h2>
+              <p className="text-gray-400">Choose your preferred setup method</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {setupModes.map((mode, index) => (
+                <motion.div
+                  key={mode.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 * index }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => router.push(mode.route)}
+                  className="glass-card p-6 cursor-pointer hover:bg-white/5 transition-all duration-300 group"
+                >
+                  <div className="text-center">
+                    <div className={`w-16 h-16 bg-gradient-to-r ${mode.color} rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
+                      <mode.icon className="w-8 h-8 text-white" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-white mb-2">{mode.title}</h4>
+                    <p className="text-sm text-gray-400 mb-4">{mode.description}</p>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      {mode.features.map((feature, fIndex) => (
+                        <span key={fIndex} className="text-xs bg-purple-900/50 text-purple-200 px-2 py-1 rounded-full">
+                          {feature}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Actions Sidebar */}
+          <div className="space-y-6">
+            <div className="glass-card p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
+              <div className="space-y-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleGenerateTimetable}
+                  disabled={isGenerating}
+                  className="w-full bg-gradient-to-r from-purple-500 to-violet-600 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 transition-colors disabled:opacity-50"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="spinner" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      <span>Generate Timetable</span>
+                    </>
+                  )}
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => router.push('/dashboard/admin/analytics')}
+                  className="w-full glass-card border border-purple-500/30 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-purple-500/10 transition-colors"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>View Analytics</span>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => router.push('/dashboard/admin/settings')}
+                  className="w-full glass-card border border-gray-500/30 text-white px-4 py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-gray-500/10 transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
+                </motion.button>
               </div>
-              
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-1 text-green-400">
-                  <CheckCircle className="w-4 h-4" />
-                  <span className="text-sm">Active</span>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="glass-card p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Recent Activity</h3>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm text-white">Timetable generated</p>
+                    <p className="text-xs text-gray-400">2 minutes ago</p>
+                  </div>
                 </div>
-                
-                <ExportMenu
-                  timetableId={activeTimetable.id}
-                  timetable={activeTimetable}
-                  type="timetable"
-                />
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm text-white">New branch added</p>
+                    <p className="text-xs text-gray-400">1 hour ago</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                  <div className="flex-1">
+                    <p className="text-sm text-white">System backup completed</p>
+                    <p className="text-xs text-gray-400">3 hours ago</p>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <div id="timetable-grid">
-              <TimetableGrid timetable={activeTimetable} />
+          </div>
+        </div>
+
+        {/* Setup Information */}
+        <div className="glass-card p-6">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-purple-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h4 className="font-medium text-purple-300 mb-2">Setup Guide</h4>
+              <div className="text-sm text-gray-300 space-y-2">
+                <p><strong>First time?</strong> Start with Quick Setup or Setup Wizard for guided configuration.</p>
+                <p><strong>Large institution?</strong> Use Batch Setup for comprehensive multi-branch configuration.</p>
+                <p><strong>Have Excel data?</strong> Use Excel Import option to upload your existing data.</p>
+                <p><strong>Want AI help?</strong> Try Smart Setup for intelligent recommendations and optimization.</p>
+                <p><strong>Need visual builder?</strong> Use Simple Creator for drag-and-drop timetable building.</p>
+              </div>
             </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="glass-card p-12 text-center mb-8"
-          >
-            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">No Active Timetable</h3>
-            <p className="text-gray-400 mb-6">
-              Generate your first timetable to get started with scheduling.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowTimetableWizard(true)}
-                disabled={isGenerating}
-                className="bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 disabled:opacity-50"
-              >
-                <Sparkles className="w-5 h-5" />
-                <span>Create Intelligent Timetable</span>
-              </motion.button>
-
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleGenerateTimetable}
-                disabled={isGenerating || !selectedInstitution}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 disabled:opacity-50"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="spinner" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-5 h-5" />
-                    <span>Quick Generate</span>
-                  </>
-                )}
-              </motion.button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Analytics Section */}
-        {activeTimetable && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <AnalyticsDashboard 
-              institutionId={selectedInstitution?.id}
-              timetableId={activeTimetable.id}
-            />
-          </motion.div>
-        )}
-      </main>
-
-      {/* Timetable Generation Wizard */}
-      {showTimetableWizard && (
-        <TimetableGenerationWizard
-          onComplete={handleIntelligentGeneration}
-          onCancel={() => setShowTimetableWizard(false)}
-        />
-      )}
-
-      {/* Unified Timetable Setup */}
-      {showUnifiedSetup && (
-        <UnifiedTimetableSetup
-          onComplete={(timetableData) => {
-            console.log('Unified setup completed:', timetableData)
-            setShowUnifiedSetup(false)
-            // Handle the generated timetables
-            toast.success('Timetables generated successfully!')
-          }}
-          onCancel={() => setShowUnifiedSetup(false)}
-        />
-      )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

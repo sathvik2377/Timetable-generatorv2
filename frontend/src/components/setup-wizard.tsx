@@ -295,7 +295,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
-    
+
     try {
       // Create institution
       const institution = await apiClient.createInstitution({
@@ -303,56 +303,122 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         type: formData.institutionType as 'school' | 'college' | 'university'
       })
 
-      // Create branches
+      // Create branches with validation
       const createdBranches = []
+      const branchCodes = new Set()
+
       for (const branch of formData.branches) {
         if (branch.name && branch.code) {
-          const createdBranch = await apiClient.createBranch({
-            ...branch,
-            institution: institution.id
-          })
-          createdBranches.push(createdBranch)
+          // Check for duplicate codes
+          if (branchCodes.has(branch.code)) {
+            toast.error(`Duplicate branch code: ${branch.code}`)
+            continue
+          }
+          branchCodes.add(branch.code)
+
+          try {
+            const createdBranch = await apiClient.createBranch({
+              ...branch,
+              institution: institution.id
+            })
+            createdBranches.push(createdBranch)
+          } catch (branchError: any) {
+            console.error('Branch creation error:', branchError)
+            if (branchError.response?.status === 400) {
+              toast.error(`Failed to create branch ${branch.code}: ${branchError.response.data?.code?.[0] || 'Validation error'}`)
+            }
+          }
         }
       }
 
-      // Create subjects
+      if (createdBranches.length === 0) {
+        throw new Error('No branches were created successfully')
+      }
+
+      // Create subjects with proper branch assignment
       for (const subject of formData.subjects) {
-        if (subject.name && subject.code && createdBranches.length > 0) {
-          await apiClient.createSubject({
-            ...subject,
-            type: subject.type as 'core' | 'elective' | 'lab' | 'skill' | 'project',
-            branch: createdBranches[0].id // Assign to first branch for now
-          })
+        if (subject.name && subject.code) {
+          // Find appropriate branch or use first one
+          const targetBranch = createdBranches[0] // For now, assign to first branch
+
+          try {
+            await apiClient.createSubject({
+              ...subject,
+              type: subject.type as 'core' | 'elective' | 'lab' | 'skill' | 'project',
+              branch: targetBranch.id
+            })
+          } catch (subjectError: any) {
+            console.error('Subject creation error:', subjectError)
+            if (subjectError.response?.status === 400) {
+              toast.error(`Failed to create subject ${subject.code}: Validation error`)
+            }
+          }
         }
       }
 
-      // Create rooms
+      // Create rooms with validation
       for (const room of formData.rooms) {
         if (room.name && room.code) {
-          await apiClient.createRoom({
-            ...room,
-            type: room.type as 'classroom' | 'laboratory' | 'seminar_hall' | 'auditorium' | 'library',
-            institution: institution.id
-          })
+          try {
+            await apiClient.createRoom({
+              ...room,
+              type: room.type as 'classroom' | 'laboratory' | 'seminar_hall' | 'auditorium' | 'library',
+              institution: institution.id
+            })
+          } catch (roomError: any) {
+            console.error('Room creation error:', roomError)
+            if (roomError.response?.status === 400) {
+              toast.error(`Failed to create room ${room.code}: Validation error`)
+            }
+          }
         }
       }
 
-      // Create class groups
+      // Create class groups with proper validation
+      const classGroupKeys = new Set()
+
       for (const classGroup of formData.classGroups) {
         if (classGroup.name && createdBranches.length > 0) {
-          await apiClient.createClassGroup({
-            ...classGroup,
-            branch: createdBranches[0].id
-          })
+          // Find appropriate branch or use first one
+          const targetBranch = createdBranches[0]
+
+          // Create unique key to prevent duplicates
+          const uniqueKey = `${targetBranch.id}-${classGroup.year}-${classGroup.section}`
+          if (classGroupKeys.has(uniqueKey)) {
+            toast.error(`Duplicate class group: ${classGroup.name}`)
+            continue
+          }
+          classGroupKeys.add(uniqueKey)
+
+          try {
+            await apiClient.createClassGroup({
+              ...classGroup,
+              branch: targetBranch.id
+            })
+          } catch (classGroupError: any) {
+            console.error('Class group creation error:', classGroupError)
+            if (classGroupError.response?.status === 400) {
+              const errorData = classGroupError.response.data
+              if (errorData?.non_field_errors) {
+                toast.error(`Failed to create class group ${classGroup.name}: ${errorData.non_field_errors[0]}`)
+              } else {
+                toast.error(`Failed to create class group ${classGroup.name}: Validation error`)
+              }
+            }
+          }
         }
       }
 
       toast.success('Institution setup completed successfully!')
       onComplete()
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Setup error:', error)
-      toast.error('Failed to complete setup. Please try again.')
+      if (error.response?.status === 400) {
+        toast.error(`Setup failed: ${error.response.data?.detail || 'Validation error'}`)
+      } else {
+        toast.error('Failed to complete setup. Please try again.')
+      }
     } finally {
       setIsSubmitting(false)
     }

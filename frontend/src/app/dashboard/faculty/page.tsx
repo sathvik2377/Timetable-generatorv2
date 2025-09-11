@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { 
   Calendar, 
   Clock, 
@@ -14,11 +15,14 @@ import {
 } from 'lucide-react'
 import { TimetableGrid } from '@/components/timetable-grid'
 import { ExportMenu } from '@/components/export-menu'
+import { TodoList } from '@/components/todo-list'
+import { EventPlanner } from '@/components/event-planner'
 import { apiClient } from '@/lib/api'
 import { User, Teacher, Timetable, TimetableSession } from '@/types'
 import toast from 'react-hot-toast'
 
 export default function FacultyDashboard() {
+  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [teacher, setTeacher] = useState<Teacher | null>(null)
   const [timetables, setTimetables] = useState<Timetable[]>([])
@@ -120,6 +124,16 @@ export default function FacultyDashboard() {
             </div>
 
             <div className="flex items-center space-x-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push('/dashboard/faculty/edit-timetable')}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              >
+                <Users className="w-4 h-4" />
+                <span>My Schedule</span>
+              </motion.button>
+
               {activeTimetable && (
                 <ExportMenu
                   timetableId={activeTimetable.id}
@@ -292,12 +306,53 @@ export default function FacultyDashboard() {
           </motion.div>
         </div>
 
+        {/* Productivity Tools Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-heading-2">🚀 Productivity Tools</h2>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => router.push('/dashboard/todo')}
+                className="glass-button flex items-center space-x-2 text-sm"
+              >
+                <span>📝</span>
+                <span>Full Todo List</span>
+              </button>
+              <button
+                onClick={() => router.push('/dashboard/events')}
+                className="glass-button flex items-center space-x-2 text-sm"
+              >
+                <span>📅</span>
+                <span>Full Event Planner</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <TodoList />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.7 }}
+            >
+              <EventPlanner />
+            </motion.div>
+          </div>
+        </div>
+
         {/* Timetable */}
         {activeTimetable && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.8 }}
             className="glass-card p-6"
           >
             <div className="flex items-center justify-between mb-6">
@@ -306,9 +361,9 @@ export default function FacultyDashboard() {
                 <p className="text-gray-300">{activeTimetable.name}</p>
               </div>
             </div>
-            
-            <TimetableGrid 
-              timetable={activeTimetable} 
+
+            <TimetableGrid
+              timetable={activeTimetable}
               viewType="teacher"
             />
           </motion.div>

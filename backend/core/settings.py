@@ -12,9 +12,13 @@ try:
 except ImportError:
     def config(key, default=None, cast=str):
         value = os.environ.get(key, default)
-        if cast == bool:
-            return value.lower() in ('true', '1', 'yes', 'on')
-        return cast(value) if value is not None else default
+        if cast is not None:
+            if cast is bool:
+                if isinstance(value, bool):
+                    return value
+                return str(value).lower() in ('true', '1', 'yes', 'on')
+            return cast(value) if value is not None else default
+        return value
 
 # Try to import dj_database_url, fallback to simple database config
 try:
@@ -263,4 +267,4 @@ if DEBUG:
     if config('ENABLE_DEBUG_TOOLBAR', default=False, cast=bool):
         INSTALLED_APPS += ['debug_toolbar']
         MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
-        INTERNAL_IPS = ['127.0.0.1', 'localhost']
+        INTERNAL_IPS = ['127.0.0.1','localhost']

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, LogIn, ArrowLeft, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { apiClient } from '@/lib/api'
+import axios from 'axios' // <-- Add this import
 import { ThemeToggle } from '@/components/theme-toggle'
 import Cookies from 'js-cookie'
 import toast from 'react-hot-toast'
@@ -14,7 +14,7 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const role = searchParams.get('role') || 'admin'
-  
+
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -30,42 +30,49 @@ export default function LoginPage() {
       faculty: { email: 'john.smith@demo.local', password: 'Faculty@123' },
       student: { email: 'alice.wilson@demo.local', password: 'Student@123' }
     }
-    
+
     const defaults = defaultCredentials[role as keyof typeof defaultCredentials] || defaultCredentials.admin
     setFormData(defaults)
   }, [role])
 
+  // Corrected handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
 
     try {
-      const response = await apiClient.login(formData)
-      
+      // Directly use axios to POST both fields
+      const response = await axios.post('http://localhost:8000/api/users/dev-login/', {
+        email: formData.email,
+        password: formData.password
+      })
+
       // Store tokens
-      Cookies.set('access_token', response.tokens.access, { expires: 1 })
-      Cookies.set('refresh_token', response.tokens.refresh, { expires: 7 })
-      
+      Cookies.set('access_token', response.data.tokens.access, { expires: 1 })
+      Cookies.set('refresh_token', response.data.tokens.refresh, { expires: 7 })
+
       // Store user data
-      localStorage.setItem('user', JSON.stringify(response.user))
-      
-      toast.success(`Welcome back, ${response.user.first_name}!`)
-      
+      localStorage.setItem('user', JSON.stringify(response.data.user))
+
+      toast.success(`Welcome back, ${response.data.user.first_name}!`)
+
       // Redirect based on role
-      const redirectPath = {
+      const redirectMap: Record<'admin' | 'faculty' | 'student', string> = {
         admin: '/dashboard/admin',
         faculty: '/dashboard/faculty',
         student: '/dashboard/student'
-      }[response.user.role] || '/dashboard'
-      
+      }
+      const userRole = response.data.user.role as 'admin' | 'faculty' | 'student'
+      const redirectPath = redirectMap[userRole] || '/dashboard'
+
       router.push(redirectPath)
-      
+
     } catch (error: any) {
       console.error('Login error:', error)
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error || 
-                          'Login failed. Please check your credentials.'
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        'Login failed. Please check your credentials.'
       setError(errorMessage)
       toast.error(errorMessage)
     } finally {
@@ -102,9 +109,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Background Elements */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900" />
-      <div className="absolute inset-0 bg-dots-pattern opacity-30" />
-      
+    <div className="absolute inset-0 bg-dots-pattern opacity-30" />
+
       {/* Floating Elements */}
       <div className="absolute top-20 left-10 w-20 h-20 bg-blue-500/20 rounded-full blur-xl animate-float" />
       <div className="absolute top-40 right-20 w-32 h-32 bg-purple-500/20 rounded-full blur-xl animate-float" style={{ animationDelay: '1s' }} />
@@ -122,7 +128,7 @@ export default function LoginPage() {
               <span>Back to Home</span>
             </motion.button>
           </Link>
-          
+
           <ThemeToggle />
         </div>
       </header>
@@ -137,7 +143,7 @@ export default function LoginPage() {
         >
           {/* Background Gradient */}
           <div className={`absolute inset-0 bg-gradient-to-r ${roleInfo.bgColor} opacity-50`} />
-          
+
           <div className="relative z-10">
             {/* Header */}
             <div className="text-center mb-8">
@@ -245,11 +251,10 @@ export default function LoginPage() {
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      className={`w-full py-2 px-3 text-xs rounded-lg transition-all ${
-                        r === role 
-                          ? 'bg-white/20 text-white' 
+                      className={`w-full py-2 px-3 text-xs rounded-lg transition-all ${r === role
+                          ? 'bg-white/20 text-white'
                           : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                      }`}
+                        }`}
                     >
                       {r.charAt(0).toUpperCase() + r.slice(1)}
                     </motion.button>

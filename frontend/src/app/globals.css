@@ -26,13 +26,13 @@
     --ring: 224.3 76.3% 94.1%;
     --radius: 0.75rem;
 
-    /* Custom theme variables with high contrast */
+    /* Custom theme variables with high contrast - Modern Blue-Teal Theme */
     --glass-bg: rgba(255, 255, 255, 0.1);
     --glass-border: rgba(255, 255, 255, 0.2);
     --glass-hover: rgba(255, 255, 255, 0.15);
     --gradient-from: #0f172a;
-    --gradient-via: #581c87;
-    --gradient-to: #0f172a;
+    --gradient-via: #0891b2;
+    --gradient-to: #1e293b;
     --text-primary: #ffffff;
     --text-secondary: #f8fafc;
     --text-muted: #e2e8f0;
@@ -124,6 +124,68 @@
     color: var(--text-muted);
   }
 
+  /* Enhanced typography hierarchy */
+  .text-display {
+    color: var(--text-primary) !important;
+    font-weight: 800;
+    font-size: 2.5rem;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+  }
+
+  .text-heading-1 {
+    color: var(--text-primary) !important;
+    font-weight: 700;
+    font-size: 2rem;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+  }
+
+  .text-heading-2 {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+  }
+
+  .text-heading-3 {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+    font-size: 1.25rem;
+    line-height: 1.35;
+  }
+
+  .text-body-large {
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+    font-size: 1.125rem;
+    line-height: 1.6;
+  }
+
+  .text-body {
+    color: var(--text-secondary) !important;
+    font-weight: 400;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .text-body-small {
+    color: var(--text-muted) !important;
+    font-weight: 400;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .text-caption {
+    color: var(--text-muted) !important;
+    font-weight: 500;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
   /* High contrast text utilities */
   .text-high-contrast {
     color: var(--text-primary) !important;
@@ -186,20 +248,52 @@
     font-weight: 400;
   }
 
-  /* Force dark text in light mode */
+  /* Enhanced typography for light mode */
+  [data-theme="light"] .text-display,
+  [data-theme="light"] .text-heading-1,
+  [data-theme="light"] .text-heading-2,
+  [data-theme="light"] .text-heading-3,
   [data-theme="light"] .text-primary,
   [data-theme="light"] .text-high-contrast {
     color: #0f172a !important;
   }
 
+  [data-theme="light"] .text-body-large,
+  [data-theme="light"] .text-body,
   [data-theme="light"] .text-secondary,
   [data-theme="light"] .text-readable {
     color: #1e293b !important;
   }
 
+  [data-theme="light"] .text-body-small,
+  [data-theme="light"] .text-caption,
   [data-theme="light"] .text-muted,
   [data-theme="light"] .text-subtitle {
     color: #475569 !important;
+  }
+
+  /* Enhanced typography for dark mode */
+  [data-theme="dark"] .text-display,
+  [data-theme="dark"] .text-heading-1,
+  [data-theme="dark"] .text-heading-2,
+  [data-theme="dark"] .text-heading-3,
+  [data-theme="dark"] .text-primary,
+  [data-theme="dark"] .text-high-contrast {
+    color: #f8fafc !important;
+  }
+
+  [data-theme="dark"] .text-body-large,
+  [data-theme="dark"] .text-body,
+  [data-theme="dark"] .text-secondary,
+  [data-theme="dark"] .text-readable {
+    color: #e2e8f0 !important;
+  }
+
+  [data-theme="dark"] .text-body-small,
+  [data-theme="dark"] .text-caption,
+  [data-theme="dark"] .text-muted,
+  [data-theme="dark"] .text-subtitle {
+    color: #94a3b8 !important;
   }
 
   /* Ensure all text elements are readable in light mode */
@@ -252,10 +346,10 @@
   }
   
   .gradient-text {
-    @apply bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-blue-400 via-cyan-500 to-teal-500 bg-clip-text text-transparent;
     /* Fallback for browsers that don't support bg-clip-text */
     color: var(--text-primary);
-    background: linear-gradient(135deg, #60a5fa, #a855f7, #ec4899);
+    background: linear-gradient(135deg, #60a5fa, #06b6d4, #14b8a6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -312,7 +406,7 @@
   }
 
   .subject-skill {
-    @apply bg-purple-500/20 border-purple-500/30;
+    @apply bg-teal-500/20 border-teal-500/30;
     color: var(--text-primary);
   }
 
@@ -451,24 +545,81 @@ textarea::placeholder {
 }
 
 /* Light mode specific overrides */
-[data-theme="light"] select,
-[data-theme="light"] select option,
-[data-theme="light"] input,
-[data-theme="light"] textarea {
+.light select,
+.light select option,
+.light input,
+.light textarea {
   background-color: #ffffff !important;
   color: #0f172a !important;
   border-color: rgba(0, 0, 0, 0.2) !important;
 }
 
-[data-theme="light"] select:focus,
-[data-theme="light"] input:focus,
-[data-theme="light"] textarea:focus {
+.light select:focus,
+.light input:focus,
+.light textarea:focus {
   border-color: #3b82f6 !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
 }
 
-[data-theme="light"] input::placeholder,
-[data-theme="light"] textarea::placeholder {
+.light input::placeholder,
+.light textarea::placeholder {
   color: #64748b !important;
   opacity: 0.8 !important;
+}
+
+/* Light mode glass effects */
+.light .glass-card {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08) !important;
+}
+
+.light .glass {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Light mode navigation and dashboard fixes */
+.light nav,
+.light .nav-item,
+.light .sidebar {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.light .nav-item:hover {
+  background: rgba(248, 250, 252, 1) !important;
+}
+
+/* Light mode text fixes */
+.light h1, .light h2, .light h3, .light h4, .light h5, .light h6,
+.light p, .light span, .light div, .light label {
+  color: #0f172a !important;
+}
+
+.light .text-white {
+  color: #0f172a !important;
+}
+
+.light .text-gray-300,
+.light .text-gray-400,
+.light .text-gray-500 {
+  color: #475569 !important;
+}
+
+.light .text-blue-300,
+.light .text-blue-400 {
+  color: #1e40af !important;
+}
+
+/* Light mode background gradients */
+.light body {
+  background: linear-gradient(135deg, #ffffff, #f8fafc, #f1f5f9) !important;
+}
+
+.light .bg-gradient-to-br {
+  background: linear-gradient(135deg, #ffffff, #f8fafc, #f1f5f9) !important;
 }

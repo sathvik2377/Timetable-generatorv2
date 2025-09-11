@@ -4,18 +4,19 @@ echo.
 
 echo [1/3] Starting Backend Server...
 cd backend
+call pip install -r requirements.txt
 start "Backend Server" cmd /k "python manage.py runserver 127.0.0.1:8000"
 timeout /t 5 /nobreak >nul
 
 echo [2/3] Starting Frontend Server...
 cd ..\frontend
+call npm install
 start "Frontend Server" cmd /k "npm run dev"
 timeout /t 5 /nobreak >nul
 
 echo [3/3] Opening Demo Pages...
 timeout /t 10 /nobreak >nul
-start http://localhost:3000/demo-simple
-start http://localhost:3000/demo-interactive
+start http://localhost:3000
 
 echo.
 echo ========================================

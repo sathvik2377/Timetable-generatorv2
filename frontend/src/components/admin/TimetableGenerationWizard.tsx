@@ -18,6 +18,7 @@ import {
   Play
 } from 'lucide-react'
 import { templateManager, TimetableGenerationData } from '@/lib/templateManager'
+import { generateAdvancedTimetable, AdvancedOptimizationConfig } from '@/lib/advancedTimetableOptimizer'
 import TemplateUploadSection from './TemplateUploadSection'
 import { toast } from 'react-hot-toast'
 
@@ -146,9 +147,65 @@ export default function TimetableGenerationWizard({ onComplete, onCancel }: Time
 
   const handleGenerate = () => {
     if (generationData.branches && generationData.teachers && generationData.subjects && generationData.rooms && generationData.preferences) {
-      onComplete(generationData as TimetableGenerationData)
+      // Ensure mandatory lunch break is set
+      const preferences = {
+        ...generationData.preferences,
+        lunchBreak: generationData.preferences.lunchBreak || '13:00-14:00',
+        mandatoryLunchBreak: true // Enforce lunch break
+      }
+
+      // Use advanced optimization with enhanced configuration
+      const defaultConfig: AdvancedOptimizationConfig = {
+        maxIterations: 1000,
+        populationSize: 50,
+        mutationRate: 0.1,
+        crossoverRate: 0.8,
+        elitismRate: 0.2,
+        convergenceThreshold: 0.001,
+        weightings: {
+          teacherConflicts: 10.0, // Prevent teacher conflicts (highest priority)
+          roomConflicts: 8.0,
+          classConflicts: 10.0,
+          teacherPreferences: 3.0,
+          roomUtilization: 2.0,
+          timeDistribution: 4.0,
+          consecutiveHours: 5.0,
+          lunchBreakViolations: 9.0 // High priority for lunch break enforcement
+        }
+      }
+
+      const optimizationConfig: AdvancedOptimizationConfig = {
+        ...defaultConfig,
+        ...((generationData.preferences as any)?.optimizationConfig || {})
+      }
+
+      toast.success('🚀 Generating advanced timetable with conflict prevention...')
+
+      try {
+        const result = generateAdvancedTimetable({
+          ...generationData as TimetableGenerationData,
+          preferences
+        }, optimizationConfig)
+
+        // Add optimization results to the data
+        const enhancedData = {
+          ...generationData as TimetableGenerationData,
+          preferences,
+          optimizationResult: result
+        }
+
+        const conflictMessage = result.conflicts.length === 0
+          ? '✅ No conflicts detected!'
+          : `⚠️ ${result.conflicts.length} conflicts found and resolved`
+
+        toast.success(`🎉 Timetable generated successfully! Score: ${result.optimizationScore.toFixed(1)}/100. ${conflictMessage}`)
+        onComplete(enhancedData)
+      } catch (error) {
+        console.error('Advanced timetable generation failed:', error)
+        toast.error('❌ Timetable generation failed. Please check your data and try again.')
+      }
     } else {
-      toast.error('Please complete all steps before generating timetable')
+      toast.error('⚠️ Please complete all steps before generating timetable')
     }
   }
 
@@ -415,11 +472,33 @@ interface PreferencesStepProps {
 }
 
 function PreferencesStep({ data, onChange }: PreferencesStepProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
+  // Initialize optimization config if not present
+  const optimizationConfig = data.optimizationConfig || {
+    maxIterations: 1000,
+    populationSize: 50,
+    mutationRate: 0.1,
+    crossoverRate: 0.8,
+    elitismRate: 0.2,
+    convergenceThreshold: 0.001,
+    weightings: {
+      teacherConflicts: 10.0,
+      roomConflicts: 8.0,
+      classConflicts: 10.0,
+      teacherPreferences: 3.0,
+      roomUtilization: 2.0,
+      timeDistribution: 4.0,
+      consecutiveHours: 5.0,
+      lunchBreakViolations: 7.0
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400">
         <Info className="w-5 h-5" />
-        <span className="font-medium">Configure schedule timing and constraints</span>
+        <span className="font-medium">Configure schedule timing and optimization settings</span>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -450,7 +529,7 @@ function PreferencesStep({ data, onChange }: PreferencesStepProps) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Lunch Break
+              Mandatory Lunch Break <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -459,6 +538,9 @@ function PreferencesStep({ data, onChange }: PreferencesStepProps) {
               placeholder="13:00-14:00"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              🍽️ Mandatory lunch break ensures no classes are scheduled during this time
+            </p>
           </div>
         </div>
 
@@ -501,6 +583,132 @@ function PreferencesStep({ data, onChange }: PreferencesStepProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Advanced Optimization Settings */}
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center space-x-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+        >
+          <Settings className="w-4 h-4" />
+          <span className="font-medium">Advanced Optimization Settings</span>
+          <ChevronRight className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
+        </button>
+
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 space-y-4"
+            >
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-3">Genetic Algorithm Parameters</h4>
+
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Max Iterations
+                    </label>
+                    <input
+                      type="number"
+                      value={optimizationConfig.maxIterations}
+                      onChange={(e) => onChange({
+                        ...data,
+                        optimizationConfig: {
+                          ...optimizationConfig,
+                          maxIterations: parseInt(e.target.value)
+                        }
+                      })}
+                      min="100"
+                      max="5000"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Population Size
+                    </label>
+                    <input
+                      type="number"
+                      value={optimizationConfig.populationSize}
+                      onChange={(e) => onChange({
+                        ...data,
+                        optimizationConfig: {
+                          ...optimizationConfig,
+                          populationSize: parseInt(e.target.value)
+                        }
+                      })}
+                      min="10"
+                      max="200"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Mutation Rate
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={optimizationConfig.mutationRate}
+                      onChange={(e) => onChange({
+                        ...data,
+                        optimizationConfig: {
+                          ...optimizationConfig,
+                          mutationRate: parseFloat(e.target.value)
+                        }
+                      })}
+                      min="0.01"
+                      max="0.5"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                <h4 className="font-medium text-green-800 dark:text-green-200 mb-3">Conflict Weightings</h4>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  {Object.entries(optimizationConfig.weightings).map(([key, value]) => (
+                    <div key={key}>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={value}
+                        onChange={(e) => onChange({
+                          ...data,
+                          optimizationConfig: {
+                            ...optimizationConfig,
+                            weightings: {
+                              ...optimizationConfig.weightings,
+                              [key]: parseFloat(e.target.value)
+                            }
+                          }
+                        })}
+                        min="0"
+                        max="20"
+                        className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                <p><strong>Tip:</strong> Higher weights prioritize avoiding those types of conflicts. Adjust based on your institution's priorities.</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )
