@@ -11,9 +11,9 @@ out/
 build/
 dist/
 
-# Environment variables
-.env
-.env.local
+# Environment variables (keeping .env files visible for easy deployment)
+# .env
+# .env.local
 .env.development.local
 .env.test.local
 .env.production.local
@@ -191,8 +191,8 @@ temp/
 *.sln
 *.sw?
 
-# Local development
-.env.local
+# Local development (keeping .env.local visible for easy deployment)
+# .env.local
 .env.development.local
 .env.test.local
 .env.production.local
