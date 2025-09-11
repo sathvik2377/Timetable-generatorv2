@@ -26,22 +26,22 @@
     --ring: 224.3 76.3% 94.1%;
     --radius: 0.75rem;
 
-    /* Custom theme variables with high contrast - Modern Blue-Teal Theme */
-    --glass-bg: rgba(255, 255, 255, 0.1);
-    --glass-border: rgba(255, 255, 255, 0.2);
-    --glass-hover: rgba(255, 255, 255, 0.15);
-    --gradient-from: #0f172a;
-    --gradient-via: #0891b2;
-    --gradient-to: #1e293b;
+    /* Custom theme variables - Original Violet Purple Theme */
+    --glass-bg: rgba(139, 92, 246, 0.1);
+    --glass-border: rgba(139, 92, 246, 0.2);
+    --glass-hover: rgba(139, 92, 246, 0.15);
+    --gradient-from: #0f0f23;
+    --gradient-via: #581c87;
+    --gradient-to: #1e1b4b;
     --text-primary: #ffffff;
     --text-secondary: #f8fafc;
     --text-muted: #e2e8f0;
 
     /* Dark mode dropdown and form fixes */
-    --dropdown-bg: rgba(15, 23, 42, 0.95);
-    --dropdown-border: rgba(255, 255, 255, 0.2);
+    --dropdown-bg: rgba(15, 15, 35, 0.95);
+    --dropdown-border: rgba(139, 92, 246, 0.3);
     --dropdown-text: #f8fafc;
-    --dropdown-hover: rgba(30, 41, 59, 0.8);
+    --dropdown-hover: rgba(88, 28, 135, 0.8);
   }
 
   .light {
@@ -330,7 +330,8 @@
   .glass-card {
     @apply glass shadow-2xl;
     border-radius: 24px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 12px 40px rgba(88, 28, 135, 0.2);
+    border: 1px solid rgba(139, 92, 246, 0.2);
   }
 
   .glass-button {
