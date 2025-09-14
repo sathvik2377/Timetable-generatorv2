@@ -18,6 +18,7 @@ class InstitutionSerializer(serializers.ModelSerializer):
             'id', 'name', 'type', 'type_display', 'address', 'phone', 'email', 'website',
             'academic_year', 'start_time', 'end_time', 'slot_duration',
             'lunch_break_start', 'lunch_break_end', 'working_days',
+            'max_teacher_hours_per_week',  # NEP-2020 field
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -71,6 +72,7 @@ class SubjectSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'branch', 'branch_name', 'branch_code', 'code', 'name', 'type', 'type_display',
             'credits', 'semester', 'year', 'theory_hours', 'practical_hours', 'tutorial_hours',
+            'weekly_hours', 'minutes_per_slot',  # NEP-2020 fields
             'total_hours', 'prerequisites', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'total_hours', 'created_at', 'updated_at']
@@ -107,7 +109,8 @@ class TeacherSerializer(serializers.ModelSerializer):
             'id', 'user', 'user_details', 'employee_id', 'designation', 'designation_display',
             'department', 'department_name', 'specialization', 'qualification', 'experience_years',
             'max_hours_per_day', 'max_hours_per_week', 'max_consecutive_hours',
-            'availability', 'subject_assignments', 'created_at', 'updated_at'
+            'availability', 'subjects_taught', 'classes_assigned',  # NEP-2020 M2M fields
+            'subject_assignments', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -118,13 +121,14 @@ class RoomSerializer(serializers.ModelSerializer):
     """
     institution_name = serializers.CharField(source='institution.name', read_only=True)
     type_display = serializers.CharField(source='get_type_display', read_only=True)
+    is_lab = serializers.BooleanField(read_only=True)  # NEP-2020 property
     
     class Meta:
         model = Room
         fields = [
             'id', 'institution', 'institution_name', 'name', 'code', 'type', 'type_display',
             'capacity', 'has_projector', 'has_computer', 'has_whiteboard', 'has_ac',
-            'building', 'floor', 'is_active', 'availability', 'created_at', 'updated_at'
+            'building', 'floor', 'is_active', 'is_lab', 'availability', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 

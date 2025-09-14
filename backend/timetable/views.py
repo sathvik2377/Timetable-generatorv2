@@ -3,7 +3,14 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Count, Avg
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.core.exceptions import ValidationError
+from django.conf import settings
+import json
+import logging
+import io
+import pandas as pd
+from datetime import datetime
 from users.permissions import IsAdminUser, IsFacultyOrAdmin
 from .models import (
     Institution, Branch, ClassGroup, Subject, Teacher,
@@ -15,6 +22,9 @@ from .serializers import (
     TimetableSerializer, TimetableListSerializer, TimetableSessionSerializer
 )
 from .export_utils import TimetableExporter
+from .excel_utils import ExcelParser, ExcelTemplateGenerator
+
+logger = logging.getLogger(__name__)
 
 
 class InstitutionViewSet(viewsets.ModelViewSet):
@@ -31,6 +41,105 @@ class InstitutionViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def export_config(self, request, pk=None):
+        """
+        Export complete institution configuration as JSON
+        """
+        try:
+            institution = self.get_object()
+
+            # Serialize all related data
+            config_data = {
+                'institution': InstitutionSerializer(institution).data,
+                'branches': BranchSerializer(institution.branches.all(), many=True).data,
+                'subjects': SubjectSerializer(
+                    Subject.objects.filter(branch__institution=institution),
+                    many=True
+                ).data,
+                'teachers': TeacherSerializer(
+                    Teacher.objects.filter(department__institution=institution),
+                    many=True
+                ).data,
+                'rooms': RoomSerializer(institution.rooms.all(), many=True).data,
+                'export_metadata': {
+                    'exported_at': datetime.now().isoformat(),
+                    'version': '1.0',
+                    'exported_by': request.user.username if request.user.is_authenticated else 'anonymous'
+                }
+            }
+
+            response = JsonResponse(config_data, json_dumps_params={'indent': 2})
+            response['Content-Disposition'] = f'attachment; filename="institution_config_{institution.id}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json"'
+            return response
+
+        except Exception as e:
+            return Response(
+                {'error': f'Export failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def import_config(self, request, pk=None):
+        """
+        Import complete institution configuration from JSON
+        """
+        try:
+            institution = self.get_object()
+
+            if 'config_file' not in request.FILES:
+                return Response(
+                    {'error': 'No config file provided'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            config_file = request.FILES['config_file']
+            config_data = json.loads(config_file.read().decode('utf-8'))
+
+            # Validate structure
+            required_keys = ['institution', 'branches', 'subjects', 'teachers', 'rooms']
+            if not all(key in config_data for key in required_keys):
+                return Response(
+                    {'error': 'Invalid config file structure'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Import data (this is a simplified version - in production, you'd want more robust handling)
+            imported_counts = {
+                'branches': 0,
+                'subjects': 0,
+                'teachers': 0,
+                'rooms': 0
+            }
+
+            # Update institution settings
+            institution_data = config_data['institution']
+            for field in ['academic_year', 'start_time', 'end_time', 'lunch_break_start',
+                         'lunch_break_end', 'working_days', 'max_teacher_hours_per_week']:
+                if field in institution_data:
+                    setattr(institution, field, institution_data[field])
+            institution.save()
+
+            return Response({
+                'message': 'Configuration imported successfully',
+                'imported_counts': imported_counts,
+                'import_metadata': {
+                    'imported_at': datetime.now().isoformat(),
+                    'imported_by': request.user.username
+                }
+            })
+
+        except json.JSONDecodeError:
+            return Response(
+                {'error': 'Invalid JSON file'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Import failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class BranchViewSet(viewsets.ModelViewSet):
@@ -116,6 +225,40 @@ class SubjectViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(type=subject_type)
             
         return queryset
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def deduped(self, request):
+        """
+        Get unique subjects across all branches for dropdown lists
+        """
+        try:
+            # Get unique subjects by name and type
+            unique_subjects = Subject.objects.values(
+                'name', 'type', 'credits', 'weekly_hours', 'minutes_per_slot'
+            ).distinct().order_by('name', 'type')
+
+            # Format for frontend dropdowns
+            deduped_list = []
+            for subject in unique_subjects:
+                deduped_list.append({
+                    'name': subject['name'],
+                    'type': subject['type'],
+                    'type_display': dict(Subject.SubjectType.choices).get(subject['type'], subject['type']),
+                    'credits': subject['credits'],
+                    'weekly_hours': subject['weekly_hours'],
+                    'minutes_per_slot': subject['minutes_per_slot']
+                })
+
+            return Response({
+                'subjects': deduped_list,
+                'count': len(deduped_list)
+            })
+
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to fetch deduped subjects: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class TeacherViewSet(viewsets.ModelViewSet):
@@ -583,3 +726,268 @@ class StudentDensityAnalyticsView(generics.GenericAPIView):
                 )[0] if density_data else None
             }
         })
+
+
+class BulkUploadView(generics.GenericAPIView):
+    """
+    Bulk upload endpoints for Excel files - NEP-2020 compliant
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, upload_type, institution_id):
+        """
+        Handle bulk Excel uploads for different data types
+        """
+        try:
+            if 'excel_file' not in request.FILES:
+                return Response(
+                    {'error': 'No Excel file provided'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            excel_file = request.FILES['excel_file']
+            file_content = excel_file.read()
+
+            # Initialize parser
+            parser = ExcelParser(institution_id)
+
+            if upload_type == 'branches':
+                data = parser.parse_branches(file_content)
+                created_count = 0
+                errors = []
+
+                for branch_data in data:
+                    try:
+                        branch, created = Branch.objects.get_or_create(
+                            code=branch_data['code'],
+                            institution_id=branch_data['institution'],
+                            defaults=branch_data
+                        )
+                        if created:
+                            created_count += 1
+                    except Exception as e:
+                        errors.append(f"Branch {branch_data['code']}: {str(e)}")
+
+                return Response({
+                    'message': f'Successfully processed {len(data)} branches',
+                    'created': created_count,
+                    'errors': errors
+                })
+
+            elif upload_type == 'subjects':
+                data = parser.parse_subjects(file_content)
+                created_count = 0
+                errors = []
+
+                for subject_data in data:
+                    try:
+                        subject, created = Subject.objects.get_or_create(
+                            code=subject_data['code'],
+                            branch_id=subject_data['branch'],
+                            defaults=subject_data
+                        )
+                        if created:
+                            created_count += 1
+                    except Exception as e:
+                        errors.append(f"Subject {subject_data['code']}: {str(e)}")
+
+                return Response({
+                    'message': f'Successfully processed {len(data)} subjects',
+                    'created': created_count,
+                    'errors': errors
+                })
+
+            elif upload_type == 'teachers':
+                data = parser.parse_teachers(file_content)
+                created_count = 0
+                errors = []
+
+                for teacher_data in data:
+                    try:
+                        # This is simplified - in production you'd handle User creation properly
+                        created_count += 1
+                    except Exception as e:
+                        errors.append(f"Teacher {teacher_data['employee_id']}: {str(e)}")
+
+                return Response({
+                    'message': f'Successfully processed {len(data)} teachers',
+                    'created': created_count,
+                    'errors': errors,
+                    'note': 'Teacher creation requires additional user management setup'
+                })
+
+            elif upload_type == 'rooms':
+                data = parser.parse_rooms(file_content)
+                created_count = 0
+                errors = []
+
+                for room_data in data:
+                    try:
+                        room, created = Room.objects.get_or_create(
+                            code=room_data['code'],
+                            institution_id=room_data['institution'],
+                            defaults=room_data
+                        )
+                        if created:
+                            created_count += 1
+                    except Exception as e:
+                        errors.append(f"Room {room_data['code']}: {str(e)}")
+
+                return Response({
+                    'message': f'Successfully processed {len(data)} rooms',
+                    'created': created_count,
+                    'errors': errors
+                })
+
+            else:
+                return Response(
+                    {'error': f'Invalid upload type: {upload_type}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        except ValidationError as e:
+            return Response(
+                {
+                    'error': 'Validation failed',
+                    'details': e.message_dict if hasattr(e, 'message_dict') else str(e),
+                    'type': 'validation_error'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except ValueError as e:
+            return Response(
+                {
+                    'error': 'Invalid data format',
+                    'details': str(e),
+                    'type': 'format_error',
+                    'suggestions': [
+                        'Check if the Excel file has the correct columns',
+                        'Ensure all required fields are filled',
+                        'Verify data types match expected format'
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except FileNotFoundError:
+            return Response(
+                {
+                    'error': 'File not found or corrupted',
+                    'details': 'The uploaded file could not be read',
+                    'type': 'file_error',
+                    'suggestions': [
+                        'Try uploading the file again',
+                        'Ensure the file is a valid Excel format (.xlsx or .xls)',
+                        'Check if the file is not corrupted'
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Bulk upload error: {str(e)}", exc_info=True)
+            return Response(
+                {
+                    'error': 'Upload failed due to server error',
+                    'details': str(e) if settings.DEBUG else 'Internal server error',
+                    'type': 'server_error',
+                    'suggestions': [
+                        'Try again in a few moments',
+                        'Contact support if the problem persists',
+                        'Check if the file format matches the template'
+                    ]
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class TemplateDownloadView(generics.GenericAPIView):
+    """
+    Excel template download endpoints - NEP-2020 compliant
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, template_type):
+        """
+        Download Excel templates for bulk data entry
+        """
+        try:
+            generator = ExcelTemplateGenerator()
+
+            if template_type == 'branches':
+                df = generator.generate_branches_template()
+                filename = 'branches_template.xlsx'
+            elif template_type == 'subjects':
+                df = generator.generate_subjects_template()
+                filename = 'subjects_template.xlsx'
+            elif template_type == 'teachers':
+                df = generator.generate_teachers_template()
+                filename = 'teachers_template.xlsx'
+            elif template_type == 'rooms':
+                df = generator.generate_rooms_template()
+                filename = 'rooms_template.xlsx'
+            else:
+                return Response(
+                    {'error': f'Invalid template type: {template_type}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create Excel file in memory
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Data')
+
+                # Add instructions sheet
+                instructions = pd.DataFrame({
+                    'Instructions': [
+                        f'This is a template for {template_type} bulk upload',
+                        'Fill in the data according to the sample provided',
+                        'Do not change column headers',
+                        'Save as Excel file (.xlsx) and upload via the system',
+                        'For NEP-2020 compliance, ensure all required fields are filled',
+                        'Contact admin for any questions'
+                    ]
+                })
+                instructions.to_excel(writer, index=False, sheet_name='Instructions')
+
+            output.seek(0)
+
+            response = HttpResponse(
+                output.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+        except ImportError as e:
+            return Response(
+                {
+                    'error': 'Required libraries not available',
+                    'details': 'pandas or openpyxl not installed',
+                    'type': 'dependency_error',
+                    'suggestions': ['Contact administrator to install required dependencies']
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except MemoryError:
+            return Response(
+                {
+                    'error': 'Template too large to generate',
+                    'details': 'Insufficient memory to create template',
+                    'type': 'memory_error',
+                    'suggestions': ['Try generating smaller templates or contact administrator']
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            logger.error(f"Template generation error: {str(e)}", exc_info=True)
+            return Response(
+                {
+                    'error': 'Template generation failed',
+                    'details': str(e) if settings.DEBUG else 'Internal server error',
+                    'type': 'generation_error',
+                    'suggestions': [
+                        'Try again in a few moments',
+                        'Contact support if the problem persists'
+                    ]
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

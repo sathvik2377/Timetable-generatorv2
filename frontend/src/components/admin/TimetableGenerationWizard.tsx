@@ -20,6 +20,7 @@ import {
 import { templateManager, TimetableGenerationData } from '@/lib/templateManager'
 import { generateAdvancedTimetable, AdvancedOptimizationConfig } from '@/lib/advancedTimetableOptimizer'
 import TemplateUploadSection from './TemplateUploadSection'
+import { SubjectsStep, TeachersStep, ReviewStep, ResultsStep } from './WizardSteps'
 import { toast } from 'react-hot-toast'
 
 interface WizardStep {
@@ -38,6 +39,18 @@ interface TimetableGenerationWizardProps {
 export default function TimetableGenerationWizard({ onComplete, onCancel }: TimetableGenerationWizardProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [generationData, setGenerationData] = useState<Partial<TimetableGenerationData>>({
+    // NEP-2020 College Details
+    college: {
+      name: '',
+      academicYear: '2024-25',
+      type: 'college', // school vs college
+      startTime: '09:00',
+      endTime: '17:00',
+      workingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      lunchStart: '13:00',
+      lunchEnd: '14:00',
+      maxTeacherHoursPerWeek: 24
+    },
     branches: [],
     teachers: [],
     subjects: [],
@@ -53,52 +66,77 @@ export default function TimetableGenerationWizard({ onComplete, onCancel }: Time
 
   const steps: WizardStep[] = [
     {
-      id: 'branches',
-      title: 'Branches & Departments',
-      description: 'Define academic branches and their details',
-      icon: Users,
-      completed: (generationData.branches?.length || 0) > 0
+      id: 'college',
+      title: 'College Details',
+      description: 'Basic information about your institution',
+      icon: Settings,
+      completed: !!(generationData.college?.name)
     },
     {
-      id: 'teachers',
-      title: 'Faculty Information',
-      description: 'Add teachers and their specializations',
-      icon: Users,
-      completed: (generationData.teachers?.length || 0) > 0
+      id: 'branches-rooms',
+      title: 'Branches & Rooms',
+      description: 'Academic branches and facility setup',
+      icon: MapPin,
+      completed: (generationData.branches?.length || 0) > 0 && (generationData.rooms?.length || 0) > 0
     },
     {
       id: 'subjects',
-      title: 'Subject Curriculum',
-      description: 'Configure subjects for each branch',
+      title: 'Subjects',
+      description: 'NEP-2020 compliant subject configuration',
       icon: BookOpen,
       completed: (generationData.subjects?.length || 0) > 0
     },
     {
-      id: 'rooms',
-      title: 'Facilities & Rooms',
-      description: 'Set up classrooms and laboratories',
-      icon: MapPin,
-      completed: (generationData.rooms?.length || 0) > 0
+      id: 'teachers',
+      title: 'Teachers',
+      description: 'Faculty with subject and class assignments',
+      icon: Users,
+      completed: (generationData.teachers?.length || 0) > 0
     },
     {
-      id: 'preferences',
-      title: 'Schedule Preferences',
-      description: 'Configure timing and constraints',
-      icon: Settings,
-      completed: true
+      id: 'review',
+      title: 'Review & Generate',
+      description: 'Review your setup and generate timetable',
+      icon: CheckCircle,
+      completed: false
+    },
+    {
+      id: 'results',
+      title: 'Results',
+      description: 'View and export your timetable',
+      icon: Play,
+      completed: false
     }
   ]
 
   const handleFileUpload = useCallback(async (file: File, templateType: 'branches' | 'teachers' | 'subjects' | 'rooms') => {
     try {
-      const data = await templateManager.parseExcelFile(file, templateType)
-      
-      setGenerationData(prev => ({
-        ...prev,
-        [templateType]: data
-      }))
-      
-      toast.success(`${templateType} data uploaded successfully! (${data.length} entries)`)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', templateType)
+
+      const response = await fetch('/api/timetable/bulk-upload/', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+
+        // Update the local state with uploaded data
+        setGenerationData(prev => ({
+          ...prev,
+          [templateType]: result.data || []
+        }))
+
+        toast.success(`${templateType} data uploaded successfully! Created: ${result.created}, Updated: ${result.updated}`)
+      } else {
+        const errorData = await response.json()
+        toast.error(`Upload failed: ${errorData.error || 'Unknown error'}`)
+        if (errorData.details) {
+          console.error('Upload error details:', errorData.details)
+        }
+      }
     } catch (error) {
       console.error('File upload error:', error)
       toast.error(`Failed to upload ${templateType} data. Please check the file format.`)
@@ -107,29 +145,29 @@ export default function TimetableGenerationWizard({ onComplete, onCancel }: Time
 
   const handleTemplateDownload = useCallback(async (templateType: 'branches' | 'teachers' | 'subjects' | 'rooms' | 'all') => {
     try {
-      if (templateType === 'all') {
-        await templateManager.downloadAllTemplates()
-        toast.success('All templates downloaded successfully!')
+      const response = await fetch(`/api/timetable/template-download/?type=${templateType}`, {
+        method: 'GET',
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${templateType}_template.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+
+        toast.success(`${templateType} template downloaded successfully!`)
       } else {
-        switch (templateType) {
-          case 'branches':
-            await templateManager.createBranchesTemplate()
-            break
-          case 'teachers':
-            await templateManager.createTeachersTemplate()
-            break
-          case 'subjects':
-            await templateManager.createSubjectsTemplate()
-            break
-          case 'rooms':
-            await templateManager.createRoomsTemplate()
-            break
-        }
-        toast.success(`${templateType} template downloaded!`)
+        const errorData = await response.json()
+        toast.error(`Download failed: ${errorData.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Template download error:', error)
-      toast.error('Failed to download template')
+      toast.error(`Failed to download ${templateType} template`)
     }
   }, [])
 
@@ -213,43 +251,57 @@ export default function TimetableGenerationWizard({ onComplete, onCancel }: Time
     const step = steps[currentStep]
     
     switch (step.id) {
-      case 'branches':
+      case 'college':
         return (
-          <BranchesStep 
-            data={generationData.branches || []}
-            onFileUpload={(file) => handleFileUpload(file, 'branches')}
-            onTemplateDownload={() => handleTemplateDownload('branches')}
+          <CollegeDetailsStep
+            data={generationData.college || {}}
+            onChange={(college) => setGenerationData(prev => ({ ...prev, college }))}
           />
         )
-      case 'teachers':
+      case 'branches-rooms':
         return (
-          <TeachersStep 
-            data={generationData.teachers || []}
-            onFileUpload={(file) => handleFileUpload(file, 'teachers')}
-            onTemplateDownload={() => handleTemplateDownload('teachers')}
+          <BranchesRoomsStep
+            branchesData={generationData.branches || []}
+            roomsData={generationData.rooms || []}
+            onBranchesChange={(branches) => setGenerationData(prev => ({ ...prev, branches }))}
+            onRoomsChange={(rooms) => setGenerationData(prev => ({ ...prev, rooms }))}
+            onFileUpload={handleFileUpload}
+            onTemplateDownload={handleTemplateDownload}
           />
         )
       case 'subjects':
         return (
-          <SubjectsStep 
+          <SubjectsStep
             data={generationData.subjects || []}
+            branches={generationData.branches || []}
+            onDataChange={(subjects) => setGenerationData(prev => ({ ...prev, subjects }))}
             onFileUpload={(file) => handleFileUpload(file, 'subjects')}
             onTemplateDownload={() => handleTemplateDownload('subjects')}
           />
         )
-      case 'rooms':
+      case 'teachers':
         return (
-          <RoomsStep 
-            data={generationData.rooms || []}
-            onFileUpload={(file) => handleFileUpload(file, 'rooms')}
-            onTemplateDownload={() => handleTemplateDownload('rooms')}
+          <TeachersStep
+            data={generationData.teachers || []}
+            subjects={generationData.subjects || []}
+            branches={generationData.branches || []}
+            onDataChange={(teachers) => setGenerationData(prev => ({ ...prev, teachers }))}
+            onFileUpload={(file) => handleFileUpload(file, 'teachers')}
+            onTemplateDownload={() => handleTemplateDownload('teachers')}
           />
         )
-      case 'preferences':
+      case 'review':
         return (
-          <PreferencesStep 
-            data={generationData.preferences!}
-            onChange={(preferences) => setGenerationData(prev => ({ ...prev, preferences }))}
+          <ReviewStep
+            data={generationData}
+            onGenerate={handleGenerate}
+          />
+        )
+      case 'results':
+        return (
+          <ResultsStep
+            data={generationData}
+            onExport={(format) => console.log('Export:', format)}
           />
         )
       default:
@@ -380,6 +432,459 @@ export default function TimetableGenerationWizard({ onComplete, onCancel }: Time
 }
 
 // Step Components
+
+// College Details Step
+interface CollegeDetailsStepProps {
+  data: any
+  onChange: (data: any) => void
+}
+
+function CollegeDetailsStep({ data, onChange }: CollegeDetailsStepProps) {
+  const workingDayOptions = [
+    { value: 'Mon', label: 'Monday' },
+    { value: 'Tue', label: 'Tuesday' },
+    { value: 'Wed', label: 'Wednesday' },
+    { value: 'Thu', label: 'Thursday' },
+    { value: 'Fri', label: 'Friday' },
+    { value: 'Sat', label: 'Saturday' }
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
+        <Settings className="w-5 h-5" />
+        <span className="font-medium">Configure your institution details</span>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Institution Name *
+            </label>
+            <input
+              type="text"
+              value={data.name || ''}
+              onChange={(e) => onChange({ ...data, name: e.target.value })}
+              placeholder="Enter institution name"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Academic Year *
+            </label>
+            <input
+              type="text"
+              value={data.academicYear || '2024-25'}
+              onChange={(e) => onChange({ ...data, academicYear: e.target.value })}
+              placeholder="2024-25"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Institution Type
+            </label>
+            <select
+              value={data.type || 'college'}
+              onChange={(e) => onChange({ ...data, type: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="school">School</option>
+              <option value="college">College</option>
+              <option value="university">University</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Start Time
+              </label>
+              <input
+                type="time"
+                value={data.startTime || '09:00'}
+                onChange={(e) => onChange({ ...data, startTime: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                End Time
+              </label>
+              <input
+                type="time"
+                value={data.endTime || '17:00'}
+                onChange={(e) => onChange({ ...data, endTime: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Working Days
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {workingDayOptions.map((day) => (
+                <label key={day.value} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={(data.workingDays || []).includes(day.value)}
+                    onChange={(e) => {
+                      const workingDays = data.workingDays || []
+                      if (e.target.checked) {
+                        onChange({ ...data, workingDays: [...workingDays, day.value] })
+                      } else {
+                        onChange({ ...data, workingDays: workingDays.filter((d: string) => d !== day.value) })
+                      }
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{day.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Lunch Start
+              </label>
+              <input
+                type="time"
+                value={data.lunchStart || '13:00'}
+                onChange={(e) => onChange({ ...data, lunchStart: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Lunch End
+              </label>
+              <input
+                type="time"
+                value={data.lunchEnd || '14:00'}
+                onChange={(e) => onChange({ ...data, lunchEnd: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Max Teacher Hours per Week (NEP-2020)
+            </label>
+            <input
+              type="number"
+              value={data.maxTeacherHoursPerWeek || 24}
+              onChange={(e) => onChange({ ...data, maxTeacherHoursPerWeek: parseInt(e.target.value) })}
+              min="12"
+              max="40"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+            />
+            <p className="text-xs text-gray-500 mt-1">NEP-2020 compliant teaching load (12-40 hours)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Branches & Rooms Combined Step
+interface BranchesRoomsStepProps {
+  branchesData: any[]
+  roomsData: any[]
+  onBranchesChange: (data: any[]) => void
+  onRoomsChange: (data: any[]) => void
+  onFileUpload: (file: File, type: string) => void
+  onTemplateDownload: (type: string) => void
+}
+
+function BranchesRoomsStep({
+  branchesData,
+  roomsData,
+  onBranchesChange,
+  onRoomsChange,
+  onFileUpload,
+  onTemplateDownload
+}: BranchesRoomsStepProps) {
+  const [activeTab, setActiveTab] = useState<'branches' | 'rooms'>('branches')
+
+  const addBranch = () => {
+    const newBranch = {
+      id: Date.now(),
+      code: '',
+      name: '',
+      description: ''
+    }
+    onBranchesChange([...branchesData, newBranch])
+  }
+
+  const addRoom = () => {
+    const newRoom = {
+      id: Date.now(),
+      code: '',
+      name: '',
+      type: 'classroom',
+      capacity: 60,
+      isLab: false,
+      building: '',
+      floor: 1
+    }
+    onRoomsChange([...roomsData, newRoom])
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center space-x-2 text-purple-600 dark:text-purple-400">
+        <MapPin className="w-5 h-5" />
+        <span className="font-medium">Set up your academic structure and facilities</span>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+        <button
+          onClick={() => setActiveTab('branches')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'branches'
+              ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          Branches ({branchesData.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('rooms')}
+          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'rooms'
+              ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          Rooms ({roomsData.length})
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'branches' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Academic Branches</h3>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => onTemplateDownload('branches')}
+                className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center space-x-1"
+              >
+                <Download className="w-4 h-4" />
+                <span>Template</span>
+              </button>
+              <button
+                onClick={() => document.getElementById('branches-upload')?.click()}
+                className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800 flex items-center space-x-1"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Upload</span>
+              </button>
+              <input
+                id="branches-upload"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0], 'branches')}
+                className="hidden"
+              />
+              <button
+                onClick={addBranch}
+                className="px-3 py-1 text-sm bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-md hover:bg-green-200 dark:hover:bg-green-800"
+              >
+                Add Branch
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {branchesData.map((branch, index) => (
+              <div key={branch.id || index} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Branch Code *
+                    </label>
+                    <input
+                      type="text"
+                      value={branch.code || ''}
+                      onChange={(e) => {
+                        const updated = [...branchesData]
+                        updated[index] = { ...branch, code: e.target.value }
+                        onBranchesChange(updated)
+                      }}
+                      placeholder="CSE, ECE, ME..."
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Branch Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={branch.name || ''}
+                      onChange={(e) => {
+                        const updated = [...branchesData]
+                        updated[index] = { ...branch, name: e.target.value }
+                        onBranchesChange(updated)
+                      }}
+                      placeholder="Computer Science Engineering..."
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={() => {
+                        const updated = branchesData.filter((_, i) => i !== index)
+                        onBranchesChange(updated)
+                      }}
+                      className="px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'rooms' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Facilities & Rooms</h3>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => onTemplateDownload('rooms')}
+                className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center space-x-1"
+              >
+                <Download className="w-4 h-4" />
+                <span>Template</span>
+              </button>
+              <button
+                onClick={() => document.getElementById('rooms-upload')?.click()}
+                className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-800 flex items-center space-x-1"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Upload</span>
+              </button>
+              <input
+                id="rooms-upload"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => e.target.files?.[0] && onFileUpload(e.target.files[0], 'rooms')}
+                className="hidden"
+              />
+              <button
+                onClick={addRoom}
+                className="px-3 py-1 text-sm bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-md hover:bg-green-200 dark:hover:bg-green-800"
+              >
+                Add Room
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {roomsData.map((room, index) => (
+              <div key={room.id || index} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                <div className="grid md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Room Code *
+                    </label>
+                    <input
+                      type="text"
+                      value={room.code || ''}
+                      onChange={(e) => {
+                        const updated = [...roomsData]
+                        updated[index] = { ...room, code: e.target.value }
+                        onRoomsChange(updated)
+                      }}
+                      placeholder="CR101, LAB201..."
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Room Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={room.name || ''}
+                      onChange={(e) => {
+                        const updated = [...roomsData]
+                        updated[index] = { ...room, name: e.target.value }
+                        onRoomsChange(updated)
+                      }}
+                      placeholder="Classroom 101..."
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Type & Capacity
+                    </label>
+                    <div className="flex space-x-2">
+                      <select
+                        value={room.type || 'classroom'}
+                        onChange={(e) => {
+                          const updated = [...roomsData]
+                          updated[index] = { ...room, type: e.target.value, isLab: e.target.value === 'laboratory' }
+                          onRoomsChange(updated)
+                        }}
+                        className="flex-1 px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                      >
+                        <option value="classroom">Classroom</option>
+                        <option value="laboratory">Laboratory</option>
+                        <option value="seminar_hall">Seminar Hall</option>
+                      </select>
+                      <input
+                        type="number"
+                        value={room.capacity || 60}
+                        onChange={(e) => {
+                          const updated = [...roomsData]
+                          updated[index] = { ...room, capacity: parseInt(e.target.value) }
+                          onRoomsChange(updated)
+                        }}
+                        placeholder="60"
+                        className="w-16 px-2 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={() => {
+                        const updated = roomsData.filter((_, i) => i !== index)
+                        onRoomsChange(updated)
+                      }}
+                      className="px-3 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface StepProps {
   data: any[]
   onFileUpload: (file: File) => void

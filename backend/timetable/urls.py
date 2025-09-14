@@ -27,10 +27,18 @@ urlpatterns = [
     path('analytics/room-utilization/', 
          views.RoomUtilizationAnalyticsView.as_view(), 
          name='room-utilization-analytics'),
-    path('analytics/student-density/', 
-         views.StudentDensityAnalyticsView.as_view(), 
+    path('analytics/student-density/',
+         views.StudentDensityAnalyticsView.as_view(),
          name='student-density-analytics'),
-    
+
+    # NEP-2020 Bulk Upload/Download endpoints
+    path('upload/excel/<str:upload_type>/<int:institution_id>/',
+         views.BulkUploadView.as_view(),
+         name='bulk-upload-excel'),
+    path('download/template/<str:template_type>/',
+         views.TemplateDownloadView.as_view(),
+         name='download-template'),
+
     # Include router URLs
     path('', include(router.urls)),
 ]

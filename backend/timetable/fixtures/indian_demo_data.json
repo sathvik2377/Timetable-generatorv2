@@ -1,0 +1,291 @@
+[
+  {
+    "model": "timetable.institution",
+    "pk": 1,
+    "fields": {
+      "name": "Bharatiya Institute of Technology",
+      "code": "BIT",
+      "type": "college",
+      "address": "Sector 15, Noida, Uttar Pradesh 201301",
+      "phone": "+91-120-2345678",
+      "email": "admin@bit.edu.in",
+      "website": "https://www.bit.edu.in",
+      "established_year": 2005,
+      "affiliation": "Dr. A.P.J. Abdul Kalam Technical University",
+      "working_days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      "lunch_break_start": "13:00:00",
+      "lunch_break_end": "14:00:00",
+      "max_teacher_hours_per_week": 24,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.branch",
+    "pk": 1,
+    "fields": {
+      "institution": 1,
+      "code": "CSE",
+      "name": "Computer Science Engineering",
+      "description": "Department of Computer Science and Engineering",
+      "head_of_department": "Dr. Rajesh Kumar",
+      "established_year": 2005,
+      "total_intake": 120,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.branch",
+    "pk": 2,
+    "fields": {
+      "institution": 1,
+      "code": "ECE",
+      "name": "Electronics & Communication Engineering",
+      "description": "Department of Electronics and Communication Engineering",
+      "head_of_department": "Dr. Priya Sharma",
+      "established_year": 2006,
+      "total_intake": 90,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.branch",
+    "pk": 3,
+    "fields": {
+      "institution": 1,
+      "code": "ME",
+      "name": "Mechanical Engineering",
+      "description": "Department of Mechanical Engineering",
+      "head_of_department": "Dr. Vikram Singh",
+      "established_year": 2007,
+      "total_intake": 60,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.subject",
+    "pk": 1,
+    "fields": {
+      "institution": 1,
+      "branch": 1,
+      "code": "CS101",
+      "name": "Programming Fundamentals",
+      "description": "Introduction to programming concepts using C language",
+      "type": "theory",
+      "credits": 4,
+      "total_hours": 4,
+      "weekly_hours": 4,
+      "minutes_per_slot": 60,
+      "semester": 1,
+      "year": 1,
+      "is_elective": false,
+      "prerequisites": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.subject",
+    "pk": 2,
+    "fields": {
+      "institution": 1,
+      "branch": 1,
+      "code": "CS102L",
+      "name": "Programming Lab",
+      "description": "Hands-on programming practice in C language",
+      "type": "lab",
+      "credits": 2,
+      "total_hours": 3,
+      "weekly_hours": 3,
+      "minutes_per_slot": 120,
+      "semester": 1,
+      "year": 1,
+      "is_elective": false,
+      "prerequisites": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.subject",
+    "pk": 3,
+    "fields": {
+      "institution": 1,
+      "branch": 1,
+      "code": "MA101",
+      "name": "Engineering Mathematics-I",
+      "description": "Calculus, Linear Algebra and Differential Equations",
+      "type": "theory",
+      "credits": 4,
+      "total_hours": 4,
+      "weekly_hours": 4,
+      "minutes_per_slot": 60,
+      "semester": 1,
+      "year": 1,
+      "is_elective": false,
+      "prerequisites": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.subject",
+    "pk": 4,
+    "fields": {
+      "institution": 1,
+      "branch": 1,
+      "code": "PH101",
+      "name": "Engineering Physics",
+      "description": "Fundamental concepts of physics for engineers",
+      "type": "theory",
+      "credits": 3,
+      "total_hours": 3,
+      "weekly_hours": 3,
+      "minutes_per_slot": 60,
+      "semester": 1,
+      "year": 1,
+      "is_elective": false,
+      "prerequisites": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.subject",
+    "pk": 5,
+    "fields": {
+      "institution": 1,
+      "branch": 1,
+      "code": "GE101",
+      "name": "Environmental Science",
+      "description": "Environmental awareness and sustainability (NEP-2020 Ability Enhancement)",
+      "type": "ability_enhancement",
+      "credits": 3,
+      "total_hours": 3,
+      "weekly_hours": 3,
+      "minutes_per_slot": 60,
+      "semester": 1,
+      "year": 1,
+      "is_elective": false,
+      "prerequisites": [],
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.room",
+    "pk": 1,
+    "fields": {
+      "institution": 1,
+      "code": "CR101",
+      "name": "Classroom 101",
+      "type": "classroom",
+      "capacity": 60,
+      "building": "Academic Block A",
+      "floor": 1,
+      "facilities": ["Projector", "Whiteboard", "AC", "WiFi"],
+      "is_lab": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.room",
+    "pk": 2,
+    "fields": {
+      "institution": 1,
+      "code": "CR102",
+      "name": "Classroom 102",
+      "type": "classroom",
+      "capacity": 60,
+      "building": "Academic Block A",
+      "floor": 1,
+      "facilities": ["Projector", "Whiteboard", "AC", "WiFi"],
+      "is_lab": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.room",
+    "pk": 3,
+    "fields": {
+      "institution": 1,
+      "code": "LAB201",
+      "name": "Computer Programming Lab",
+      "type": "laboratory",
+      "capacity": 30,
+      "building": "Academic Block B",
+      "floor": 2,
+      "facilities": ["30 Computers", "Projector", "AC", "WiFi", "UPS"],
+      "is_lab": true,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.room",
+    "pk": 4,
+    "fields": {
+      "institution": 1,
+      "code": "SH301",
+      "name": "Seminar Hall",
+      "type": "seminar_hall",
+      "capacity": 150,
+      "building": "Academic Block C",
+      "floor": 3,
+      "facilities": ["Audio System", "Projector", "Stage", "AC", "WiFi"],
+      "is_lab": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.classgroup",
+    "pk": 1,
+    "fields": {
+      "institution": 1,
+      "branch": 1,
+      "year": 1,
+      "section": "A",
+      "strength": 30,
+      "academic_year": "2024-25",
+      "class_teacher": null,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.classgroup",
+    "pk": 2,
+    "fields": {
+      "institution": 1,
+      "branch": 1,
+      "year": 1,
+      "section": "B",
+      "strength": 30,
+      "academic_year": "2024-25",
+      "class_teacher": null,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "timetable.classgroup",
+    "pk": 3,
+    "fields": {
+      "institution": 1,
+      "branch": 2,
+      "year": 1,
+      "section": "A",
+      "strength": 30,
+      "academic_year": "2024-25",
+      "class_teacher": null,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  }
+]

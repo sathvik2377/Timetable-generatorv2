@@ -36,12 +36,19 @@ class Institution(models.Model):
     lunch_break_start = models.TimeField(default='13:00:00')
     lunch_break_end = models.TimeField(default='14:00:00')
     
-    # Working days
+    # Working days - NEP-2020 compliant
     working_days = models.JSONField(
-        default=list,
-        help_text='List of working days (0=Monday, 6=Sunday)'
+        default=lambda: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        help_text='List of working days (e.g., ["Mon","Tue","Wed","Thu","Fri"])'
     )
-    
+
+    # NEP-2020 Teaching Load Management
+    max_teacher_hours_per_week = models.IntegerField(
+        default=24,
+        validators=[MinValueValidator(12), MaxValueValidator(40)],
+        help_text='Maximum teaching hours per teacher per week (NEP-2020 compliant)'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -123,11 +130,13 @@ class Subject(models.Model):
     """
     
     class SubjectType(models.TextChoices):
+        THEORY = 'theory', _('Theory')
+        LAB = 'lab', _('Laboratory')
+        PROJECT = 'project', _('Project Work')
+        ABILITY_ENHANCEMENT = 'ability_enhancement', _('Ability Enhancement')
         CORE = 'core', _('Core Subject')
         ELECTIVE = 'elective', _('Elective Subject')
-        LAB = 'lab', _('Laboratory')
         SKILL = 'skill', _('Skill Development')
-        PROJECT = 'project', _('Project Work')
     
     branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name='subjects')
     code = models.CharField(max_length=20)
@@ -143,10 +152,22 @@ class Subject(models.Model):
     semester = models.IntegerField(default=1)
     year = models.IntegerField(default=1)
     
-    # Teaching details
+    # Teaching details - NEP-2020 compliant
     theory_hours = models.IntegerField(default=3, help_text='Theory hours per week')
     practical_hours = models.IntegerField(default=0, help_text='Practical hours per week')
     tutorial_hours = models.IntegerField(default=0, help_text='Tutorial hours per week')
+
+    # NEP-2020 specific fields
+    weekly_hours = models.IntegerField(
+        default=3,
+        validators=[MinValueValidator(1), MaxValueValidator(10)],
+        help_text='Total weekly hours for this subject'
+    )
+    minutes_per_slot = models.IntegerField(
+        default=60,
+        validators=[MinValueValidator(30), MaxValueValidator(180)],
+        help_text='Duration of each class slot in minutes'
+    )
     
     # Prerequisites
     prerequisites = models.ManyToManyField('self', blank=True, symmetrical=False)
@@ -204,8 +225,20 @@ class Teacher(models.Model):
         help_text='Day-wise availability slots'
     )
     
-    # Subjects taught
+    # Subjects taught - NEP-2020 compliant relationships
     subjects = models.ManyToManyField(Subject, through='TeacherSubject', related_name='teachers')
+    subjects_taught = models.ManyToManyField(
+        Subject,
+        blank=True,
+        related_name='qualified_teachers',
+        help_text='Subjects this teacher is qualified to teach'
+    )
+    classes_assigned = models.ManyToManyField(
+        Branch,
+        blank=True,
+        related_name='assigned_teachers',
+        help_text='Branches/Classes this teacher is assigned to'
+    )
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -295,6 +328,11 @@ class Room(models.Model):
 
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+    @property
+    def is_lab(self):
+        """Check if room is a laboratory - NEP-2020 compliant"""
+        return self.type == self.RoomType.LABORATORY
 
 
 class Timetable(models.Model):
