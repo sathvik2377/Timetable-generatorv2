@@ -21,10 +21,16 @@ import {
   Cpu
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { TimetableVariantSelector } from '@/components/TimetableVariantSelector'
+import { withAuth } from '@/lib/auth'
+import { generateTimetableVariants } from '@/lib/apiUtils'
 
-export default function AdvancedSetupPage() {
+function AdvancedSetupPage() {
   const router = useRouter()
   const [isGenerating, setIsGenerating] = useState(false)
+  const [variants, setVariants] = useState<any[]>([])
+  const [showVariantSelector, setShowVariantSelector] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const [formData, setFormData] = useState({
     institutionName: '',
     institutionType: 'university',
@@ -118,40 +124,45 @@ export default function AdvancedSetupPage() {
   }
 
   const handleGenerate = async () => {
+    setIsGenerating(true)
     try {
-      setIsGenerating(true)
       toast.loading('Processing advanced constraints with OR-Tools CP-SAT Solver...')
-      
-      // Simulate advanced processing
-      await new Promise(resolve => setTimeout(resolve, 5000))
-      
-      const timetableData = {
-        institution: formData.institutionName || 'Advanced Institution',
-        type: formData.institutionType,
-        schedule: generateAdvancedSchedule(),
-        metadata: {
-          generated_at: new Date().toISOString(),
-          optimization_score: Math.floor(Math.random() * 5) + 95, // 95-100%
-          conflicts_resolved: Math.floor(Math.random() * 15) + 10,
-          constraints_applied: Object.keys(formData.constraints).length,
-          advanced_features_enabled: Object.values(formData.advancedFeatures).filter(Boolean).length,
-          total_sessions: formData.subjects * formData.branches * 6, // 6 days
-          processing_time: '4.8 seconds',
-          algorithm: 'OR-Tools CP-SAT with Advanced Constraints'
-        }
+
+      const response = await generateTimetableVariants('advanced', formData)
+
+      if (response.data.variants && response.data.variants.length > 0) {
+        setVariants(response.data.variants)
+        setShowVariantSelector(true)
+        toast.dismiss()
+        toast.success(`Generated ${response.data.variants.length} advanced timetable variants!`)
+      } else {
+        toast.error('No timetable variants generated')
       }
-      
-      toast.dismiss()
-      toast.success(`Advanced timetable generated! Optimization: ${timetableData.metadata.optimization_score}%, ${timetableData.metadata.conflicts_resolved} conflicts resolved`)
-      
-      localStorage.setItem('generatedTimetable', JSON.stringify(timetableData))
-      router.push('/dashboard/admin')
-    } catch (error) {
-      toast.dismiss()
-      toast.error('Error in advanced generation')
-      console.error('Generation error:', error)
+    } catch (error: any) {
+      console.error('Advanced timetable generation error:', error)
+      toast.error(error.response?.data?.error || 'Failed to generate advanced timetable')
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleRegenerateVariants = async () => {
+    setIsRegenerating(true)
+    try {
+      toast.loading('Regenerating advanced timetable variants...')
+
+      const response = await generateTimetableVariants('advanced', formData)
+
+      if (response.data.variants && response.data.variants.length > 0) {
+        setVariants(response.data.variants)
+        toast.dismiss()
+        toast.success(`Regenerated ${response.data.variants.length} new variants!`)
+      }
+    } catch (error: any) {
+      console.error('Regeneration error:', error)
+      toast.error('Failed to regenerate variants')
+    } finally {
+      setIsRegenerating(false)
     }
   }
 
@@ -679,6 +690,19 @@ export default function AdvancedSetupPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Timetable Variant Selector Modal */}
+      {showVariantSelector && (
+        <TimetableVariantSelector
+          variants={variants}
+          onClose={() => setShowVariantSelector(false)}
+          onRegenerate={handleRegenerateVariants}
+          isRegenerating={isRegenerating}
+          setupMode="advanced"
+        />
+      )}
     </div>
   )
 }
+
+export default withAuth(AdvancedSetupPage, ['admin'])

@@ -1,8 +1,11 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Users, UserPlus, Search, Filter, Edit3, Trash2, Mail, Phone, Shield, GraduationCap, BookOpen } from 'lucide-react';
+import { apiClient } from '@/lib/api';
+import { authenticatedGet, authenticatedPost } from '@/lib/apiUtils';
+import toast from 'react-hot-toast';
 
 interface User {
   id: number;
@@ -16,58 +19,8 @@ interface User {
 }
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 1,
-      name: 'Admin User',
-      email: 'admin@demo.local',
-      role: 'admin',
-      phone: '+1-234-567-8900',
-      department: 'Administration',
-      status: 'active',
-      lastLogin: '2024-01-15 10:30 AM'
-    },
-    {
-      id: 2,
-      name: 'Dr. John Smith',
-      email: 'john.smith@demo.local',
-      role: 'faculty',
-      phone: '+1-234-567-8901',
-      department: 'Computer Science',
-      status: 'active',
-      lastLogin: '2024-01-15 09:15 AM'
-    },
-    {
-      id: 3,
-      name: 'Prof. Sarah Johnson',
-      email: 'sarah.johnson@demo.local',
-      role: 'faculty',
-      phone: '+1-234-567-8902',
-      department: 'Mathematics',
-      status: 'active',
-      lastLogin: '2024-01-14 02:45 PM'
-    },
-    {
-      id: 4,
-      name: 'Alice Wilson',
-      email: 'alice.wilson@demo.local',
-      role: 'student',
-      phone: '+1-234-567-8903',
-      department: 'Computer Science',
-      status: 'active',
-      lastLogin: '2024-01-15 08:20 AM'
-    },
-    {
-      id: 5,
-      name: 'Bob Davis',
-      email: 'bob.davis@demo.local',
-      role: 'student',
-      phone: '+1-234-567-8904',
-      department: 'Mathematics',
-      status: 'active',
-      lastLogin: '2024-01-14 11:30 AM'
-    }
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -84,28 +37,115 @@ export default function AdminUsersPage() {
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
+  // Fetch users from backend
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await authenticatedGet('http://localhost:8000/api/users/');
+
+        // Transform backend user data to match frontend interface
+        const transformedUsers = response.data.results?.map((user: any) => ({
+          id: user.id,
+          name: `${user.first_name} ${user.last_name}`.trim() || user.username,
+          email: user.email,
+          role: user.role,
+          phone: user.phone_number || 'N/A',
+          department: user.profile?.department || 'N/A',
+          status: user.is_active ? 'active' : 'inactive',
+          lastLogin: user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'
+        })) || [];
+
+        setUsers(transformedUsers);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+        toast.error('Failed to load users');
+
+        // Fallback to demo data if API fails
+        setUsers([
+          {
+            id: 1,
+            name: 'Admin User',
+            email: 'admin@demo.local',
+            role: 'admin',
+            phone: '+1-234-567-8900',
+            department: 'Administration',
+            status: 'active',
+            lastLogin: '2024-01-15 10:30 AM'
+          },
+          {
+            id: 2,
+            name: 'Faculty User',
+            email: 'faculty@demo.local',
+            role: 'faculty',
+            phone: '+1-234-567-8901',
+            department: 'Computer Science',
+            status: 'active',
+            lastLogin: '2024-01-15 09:15 AM'
+          },
+          {
+            id: 3,
+            name: 'Student User',
+            email: 'student@demo.local',
+            role: 'student',
+            phone: '+1-234-567-8902',
+            department: 'Computer Science',
+            status: 'active',
+            lastLogin: '2024-01-14 02:45 PM'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
   // User management functions
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
 
-    const user: User = {
-      id: users.length + 1,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      phone: newUser.phone,
-      department: newUser.department,
-      status: 'active',
-      lastLogin: 'Never'
-    };
+    try {
+      const [firstName, ...lastNameParts] = newUser.name.split(' ');
+      const lastName = lastNameParts.join(' ') || '';
 
-    setUsers([...users, user]);
-    setNewUser({ name: '', email: '', role: 'student', phone: '', department: '', password: '' });
-    setShowAddUserModal(false);
-    alert('User added successfully!');
+      const userData = {
+        username: newUser.email.split('@')[0],
+        email: newUser.email,
+        first_name: firstName,
+        last_name: lastName,
+        role: newUser.role,
+        password: newUser.password,
+        phone_number: newUser.phone,
+        is_active: true
+      };
+
+      const response = await authenticatedPost('http://localhost:8000/api/users/', userData);
+
+      // Add the new user to the local state
+      const newUserData: User = {
+        id: response.data.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        phone: newUser.phone || 'N/A',
+        department: newUser.department || 'N/A',
+        status: 'active',
+        lastLogin: 'Never'
+      };
+
+      setUsers([...users, newUserData]);
+      setNewUser({ name: '', email: '', role: 'student', phone: '', department: '', password: '' });
+      setShowAddUserModal(false);
+      toast.success('User added successfully!');
+    } catch (error) {
+      console.error('Failed to add user:', error);
+      toast.error('Failed to add user');
+    }
   };
 
   const handleEditUser = (user: User) => {
@@ -348,13 +388,24 @@ export default function AdminUsersPage() {
           </div>
         </motion.div>
 
-        {/* Users Table */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="glass border-0 rounded-lg p-6"
-        >
+        {/* Loading State */}
+        {loading ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="glass border-0 rounded-lg p-8 text-center"
+          >
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto mb-4"></div>
+            <p className="text-readable">Loading users...</p>
+          </motion.div>
+        ) : (
+          /* Users Table */
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="glass border-0 rounded-lg p-6"
+          >
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -448,6 +499,7 @@ export default function AdminUsersPage() {
             </div>
           )}
         </motion.div>
+        )}
 
         {/* Add/Edit User Modal */}
         {showAddUserModal && (

@@ -7,6 +7,10 @@ import json
 User = get_user_model()
 
 
+def default_working_days():
+    return ["Mon", "Tue", "Wed", "Thu", "Fri"]
+
+
 class Institution(models.Model):
     """
     Institution/College/School information
@@ -38,7 +42,7 @@ class Institution(models.Model):
     
     # Working days - NEP-2020 compliant
     working_days = models.JSONField(
-        default=lambda: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+        default=default_working_days,
         help_text='List of working days (e.g., ["Mon","Tue","Wed","Thu","Fri"])'
     )
 

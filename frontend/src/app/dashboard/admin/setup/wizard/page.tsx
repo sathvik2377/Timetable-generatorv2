@@ -20,11 +20,17 @@ import {
   Lightbulb
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { generateTimetableVariants } from '@/lib/apiUtils'
+import { withAuth } from '@/lib/auth'
+import { TimetableVariantSelector } from '@/components/TimetableVariantSelector'
 
-export default function WizardSetupPage() {
+function WizardSetupPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [variants, setVariants] = useState<any[]>([])
+  const [showVariantSelector, setShowVariantSelector] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const [formData, setFormData] = useState({
     // Step 1: Institution Info
     institutionName: '',
@@ -95,38 +101,45 @@ export default function WizardSetupPage() {
   }
 
   const handleGenerate = async () => {
+    setIsGenerating(true)
     try {
-      setIsGenerating(true)
       toast.loading('Generating timetable with guided wizard configuration...')
-      
-      // Simulate wizard processing
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      
-      const timetableData = {
-        institution: formData.institutionName || 'Wizard Institution',
-        type: formData.institutionType,
-        schedule: generateWizardSchedule(),
-        metadata: {
-          generated_at: new Date().toISOString(),
-          optimization_score: Math.floor(Math.random() * 15) + 85, // 85-100%
-          conflicts_resolved: Math.floor(Math.random() * 8) + 2,
-          wizard_steps_completed: totalSteps,
-          total_sessions: formData.subjects * formData.branches * 5,
-          creation_method: 'guided_wizard'
-        }
+
+      const response = await generateTimetableVariants('wizard', formData)
+
+      if (response.data.variants && response.data.variants.length > 0) {
+        setVariants(response.data.variants)
+        setShowVariantSelector(true)
+        toast.dismiss()
+        toast.success(`Generated ${response.data.variants.length} wizard-guided variants!`)
+      } else {
+        toast.error('No timetable variants generated')
       }
-      
-      toast.dismiss()
-      toast.success(`Wizard timetable generated! Optimization: ${timetableData.metadata.optimization_score}%`)
-      
-      localStorage.setItem('generatedTimetable', JSON.stringify(timetableData))
-      router.push('/dashboard/admin')
-    } catch (error) {
-      toast.dismiss()
-      toast.error('Error in wizard generation')
-      console.error('Generation error:', error)
+    } catch (error: any) {
+      console.error('Wizard generation error:', error)
+      toast.error(error.response?.data?.error || 'Failed to generate wizard timetable')
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleRegenerateVariants = async () => {
+    setIsRegenerating(true)
+    try {
+      toast.loading('Regenerating wizard-guided variants...')
+
+      const response = await generateTimetableVariants('wizard', formData)
+
+      if (response.data.variants && response.data.variants.length > 0) {
+        setVariants(response.data.variants)
+        toast.dismiss()
+        toast.success(`Regenerated ${response.data.variants.length} new variants!`)
+      }
+    } catch (error: any) {
+      console.error('Regeneration error:', error)
+      toast.error('Failed to regenerate variants')
+    } finally {
+      setIsRegenerating(false)
     }
   }
 
@@ -625,6 +638,19 @@ export default function WizardSetupPage() {
           )}
         </motion.div>
       </div>
+
+      {/* Timetable Variant Selector Modal */}
+      {showVariantSelector && (
+        <TimetableVariantSelector
+          variants={variants}
+          onClose={() => setShowVariantSelector(false)}
+          onRegenerate={handleRegenerateVariants}
+          isRegenerating={isRegenerating}
+          setupMode="wizard"
+        />
+      )}
     </div>
   )
 }
+
+export default withAuth(WizardSetupPage, ['admin'])

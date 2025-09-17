@@ -93,26 +93,41 @@ class DevLoginSerializer(serializers.Serializer):
     """
     Development login serializer for quick testing
     """
-    email = serializers.EmailField()
+    email = serializers.CharField()  # Changed to CharField to accept both email and username
     password = serializers.CharField()
-    
+
     def validate(self, attrs):
-        email = attrs.get('email')
+        email_or_username = attrs.get('email')
         password = attrs.get('password')
-        
-        if email and password:
+
+        if email_or_username and password:
+            # Try to authenticate with email first
             user = authenticate(
                 request=self.context.get('request'),
-                username=email,
+                username=email_or_username,
                 password=password
             )
-            
+
+            # If that fails, try to find user by email and authenticate with username
+            if not user:
+                try:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    user_obj = User.objects.get(email=email_or_username)
+                    user = authenticate(
+                        request=self.context.get('request'),
+                        username=user_obj.username,
+                        password=password
+                    )
+                except User.DoesNotExist:
+                    pass
+
             if not user:
                 raise serializers.ValidationError('Invalid credentials')
-            
+
             if not user.is_active:
                 raise serializers.ValidationError('User account is disabled')
-            
+
             attrs['user'] = user
             return attrs
         else:

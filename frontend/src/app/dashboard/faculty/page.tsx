@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import { withAuth, useAuth } from '@/lib/auth'
 import { 
   Calendar, 
   Clock, 
@@ -21,8 +22,9 @@ import { apiClient } from '@/lib/api'
 import { User, Teacher, Timetable, TimetableSession } from '@/types'
 import toast from 'react-hot-toast'
 
-export default function FacultyDashboard() {
+function FacultyDashboard() {
   const router = useRouter()
+  const auth = useAuth()
   const [user, setUser] = useState<User | null>(null)
   const [teacher, setTeacher] = useState<Teacher | null>(null)
   const [timetables, setTimetables] = useState<Timetable[]>([])
@@ -372,3 +374,6 @@ export default function FacultyDashboard() {
     </div>
   )
 }
+
+// Export with auth guard
+export default withAuth(FacultyDashboard, ['admin', 'faculty'])

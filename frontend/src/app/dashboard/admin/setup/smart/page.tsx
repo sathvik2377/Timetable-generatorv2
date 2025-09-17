@@ -19,13 +19,19 @@ import {
   Zap,
   Plus,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Eye
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { generateTimetableVariants } from '@/lib/apiUtils'
+import { TimetableVariantSelector } from '@/components/TimetableVariantSelector'
 
 export default function SmartSetupPage() {
   const router = useRouter()
   const [isGenerating, setIsGenerating] = useState(false)
+  const [variants, setVariants] = useState<any[]>([])
+  const [showVariantSelector, setShowVariantSelector] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState({
     institutionName: '',
@@ -177,37 +183,121 @@ export default function SmartSetupPage() {
   }
 
   const handleGenerate = async () => {
+    setIsGenerating(true)
     try {
-      setIsGenerating(true)
-      toast.loading('AI is analyzing and generating optimal timetable...')
-      
-      // Simulate AI processing
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      
-      const timetableData = {
-        institution: formData.institutionName || 'Smart Institution',
-        type: formData.institutionType,
-        schedule: generateSmartSchedule(),
-        metadata: {
-          generated_at: new Date().toISOString(),
-          optimization_score: Math.floor(Math.random() * 10) + 90, // 90-100%
-          conflicts_resolved: Math.floor(Math.random() * 8) + 2,
-          ai_recommendations_applied: Math.floor(Math.random() * 5) + 3,
-          total_sessions: formData.subjects.length * 5
+      toast.loading('AI is analyzing and generating optimal timetable variants...')
+
+      // Generate multiple variants with Smart Setup data
+      const response = await generateTimetableVariants('smart', {
+        institution_id: 1,
+        name: `Smart Setup - ${formData.institutionName}`,
+        semester: 1,
+        num_variants: 3,
+        parameters: {
+          setup_mode: 'smart',
+          ...formData
         }
+      })
+
+      toast.dismiss()
+
+      if (response.data.success) {
+        setVariants(response.data.variants)
+        setShowVariantSelector(true)
+        toast.success(`AI generated ${response.data.successful_count} optimized timetable variants!`)
+      } else {
+        toast.error('Failed to generate AI-optimized timetable variants')
       }
-      
+    } catch (error: any) {
       toast.dismiss()
-      toast.success(`Smart timetable generated! Optimization: ${timetableData.metadata.optimization_score}%, Conflicts resolved: ${timetableData.metadata.conflicts_resolved}`)
-      
-      localStorage.setItem('generatedTimetable', JSON.stringify(timetableData))
-      router.push('/dashboard/admin')
-    } catch (error) {
-      toast.dismiss()
-      toast.error('Error in AI generation')
       console.error('Generation error:', error)
+      toast.error('Failed to generate timetable: ' + (error.response?.data?.message || error.message))
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleRegenerateVariants = async () => {
+    setIsRegenerating(true)
+    try {
+      const response = await generateTimetableVariants('smart', {
+        institution_id: 1,
+        name: `Smart Setup Regenerated - ${formData.institutionName}`,
+        semester: 1,
+        num_variants: 3,
+        parameters: {
+          setup_mode: 'smart',
+          regenerate: true,
+          ...formData
+        }
+      })
+
+      if (response.data.success) {
+        setVariants(response.data.variants)
+        toast.success(`AI regenerated ${response.data.successful_count} new optimized variants!`)
+      } else {
+        toast.error('Failed to regenerate variants')
+      }
+    } catch (error: any) {
+      toast.error('Failed to regenerate variants: ' + (error.response?.data?.message || error.message))
+    } finally {
+      setIsRegenerating(false)
+    }
+  }
+
+  const handleSelectVariant = async (variant: any) => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/scheduler/commit-variant/', {
+        variant: variant,
+        name: `Smart Setup - ${formData.institutionName} - Variant ${variant.variant_id}`,
+        institution_id: 1
+      }, {
+        headers: {
+          'Authorization': `Bearer ${document.cookie.split('access_token=')[1]?.split(';')[0]}`
+        }
+      })
+
+      if (response.data.success) {
+        toast.success('AI-optimized timetable variant committed successfully!')
+        setShowVariantSelector(false)
+
+        // Auto-download as PNG
+        setTimeout(() => {
+          import('@/lib/exportUtils').then(({ exportTimetableAsPNG }) => {
+            const tempDiv = document.createElement('div')
+            tempDiv.id = 'temp-smart-timetable-export'
+            tempDiv.innerHTML = `
+              <div style="padding: 20px; background: white; color: black;">
+                <h2>Smart Setup AI-Optimized Timetable - Variant ${variant.variant_id}</h2>
+                <p>Institution: ${formData.institutionName}</p>
+                <p>Quality Score: ${variant.metrics.quality_score}%</p>
+                <p>Total Sessions: ${variant.metrics.total_sessions}</p>
+                <p>AI Optimization Level: Advanced</p>
+                <p>Generated: ${new Date().toLocaleString()}</p>
+              </div>
+            `
+            document.body.appendChild(tempDiv)
+
+            exportTimetableAsPNG('temp-smart-timetable-export', {
+              filename: `smart-setup-timetable-variant-${variant.variant_id}`,
+              title: `Smart Setup AI-Optimized Timetable - Variant ${variant.variant_id}`,
+              institutionName: formData.institutionName
+            }).then(() => {
+              toast.success('AI-optimized timetable automatically downloaded as PNG!')
+              document.body.removeChild(tempDiv)
+            }).catch(() => {
+              toast.error('Failed to auto-download timetable')
+              document.body.removeChild(tempDiv)
+            })
+          })
+        }, 1000)
+
+        router.push('/dashboard/admin')
+      } else {
+        toast.error('Failed to commit variant')
+      }
+    } catch (error: any) {
+      toast.error('Failed to commit variant: ' + (error.response?.data?.message || error.message))
     }
   }
 
@@ -387,15 +477,31 @@ export default function SmartSetupPage() {
             </div>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleUseSampleData}
-            className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <Database className="w-4 h-4" />
-            <span>Use AI Sample Data</span>
-          </motion.button>
+          <div className="flex items-center space-x-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleUseSampleData}
+              className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <Database className="w-4 h-4" />
+              <span>Use AI Sample Data</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                // Open sample timetable in new tab
+                window.open('/demo-interactive', '_blank');
+                toast.success('Opening sample timetable in new tab');
+              }}
+              className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <Eye className="w-4 h-4" />
+              <span>Show Sample Timetable</span>
+            </motion.button>
+          </div>
         </motion.div>
 
         {/* AI Features Banner */}
@@ -1164,6 +1270,16 @@ export default function SmartSetupPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Timetable Variant Selector Modal */}
+      <TimetableVariantSelector
+        variants={variants}
+        isOpen={showVariantSelector}
+        onClose={() => setShowVariantSelector(false)}
+        onSelectVariant={handleSelectVariant}
+        onRegenerateVariants={handleRegenerateVariants}
+        isRegenerating={isRegenerating}
+      />
     </div>
   )
 }

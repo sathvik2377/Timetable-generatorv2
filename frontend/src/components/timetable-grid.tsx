@@ -171,7 +171,7 @@ export function TimetableGrid({ timetable, editable = false, viewType = 'general
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-card p-4 text-center bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-slate-600/30"
+              className="glass-card p-4 text-center"
             >
               <Clock className="w-5 h-5 mx-auto mb-2 text-blue-400" />
               <span className="text-sm font-semibold text-primary">Time</span>
@@ -182,7 +182,7 @@ export function TimetableGrid({ timetable, editable = false, viewType = 'general
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="glass-card p-4 text-center bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/20 hover:border-blue-400/40 transition-all duration-300"
+                className="glass-card p-4 text-center hover:bg-glass-hover transition-all duration-300"
               >
                 <span className="text-sm font-semibold text-primary">{day}</span>
                 <div className="w-full h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 mt-2 rounded-full opacity-60" />
@@ -201,8 +201,8 @@ export function TimetableGrid({ timetable, editable = false, viewType = 'general
                 className="grid grid-cols-6 gap-3"
               >
                 {/* Enhanced Time Column */}
-                <div className="glass-card p-4 text-center bg-gradient-to-r from-slate-800/40 to-slate-700/40 border-slate-600/30">
-                  <div className="text-xs font-mono text-blue-300 font-semibold">
+                <div className="glass-card p-4 text-center">
+                  <div className="text-xs font-mono text-blue-400 font-semibold">
                     {slot.display}
                   </div>
                   <div className="w-full h-px bg-gradient-to-r from-transparent via-blue-400/50 to-transparent mt-2" />
@@ -343,17 +343,17 @@ export function TimetableGrid({ timetable, editable = false, viewType = 'general
             <motion.div
               key={type}
               whileHover={{ scale: 1.05 }}
-              className="flex flex-col items-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-300 border border-white/10"
+              className="flex flex-col items-center p-3 rounded-lg glass-card hover:bg-glass-hover transition-all duration-300"
             >
               <div className="text-lg mb-1">{icon}</div>
-              <div className={`w-4 h-4 rounded-full mb-2 ${getSubjectTypeColor(type)} border-2 border-white/20`} />
+              <div className={`w-4 h-4 rounded-full mb-2 ${getSubjectTypeColor(type)} border-2 border-glass-border`} />
               <span className="text-xs font-medium text-primary text-center">{label}</span>
               <span className="text-xs text-muted text-center mt-1">{description}</span>
             </motion.div>
           ))}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-white/10">
+        <div className="mt-4 pt-4 border-t border-glass-border">
           <div className="flex items-center justify-between text-xs text-muted">
             <span>💡 Hover over sessions for details</span>
             <span>🎨 Colors indicate subject types</span>

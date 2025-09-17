@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import { withAuth, useAuth } from '@/lib/auth'
 import { 
   Calendar, 
   Clock, 
@@ -22,8 +23,9 @@ import { apiClient } from '@/lib/api'
 import { User as UserType, ClassGroup, Timetable, TimetableSession } from '@/types'
 import toast from 'react-hot-toast'
 
-export default function StudentDashboard() {
+function StudentDashboard() {
   const router = useRouter()
+  const auth = useAuth()
   const [user, setUser] = useState<UserType | null>(null)
   const [classGroup, setClassGroup] = useState<ClassGroup | null>(null)
   const [timetables, setTimetables] = useState<Timetable[]>([])
@@ -400,3 +402,6 @@ export default function StudentDashboard() {
     </div>
   )
 }
+
+// Export with auth guard
+export default withAuth(StudentDashboard, ['admin', 'faculty', 'student'])

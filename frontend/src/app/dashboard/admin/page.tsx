@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import { withAuth, useAuth } from '@/lib/auth'
 import {
   Settings,
   Users,
@@ -33,12 +34,15 @@ import {
 } from 'lucide-react'
 import { TodoList } from '@/components/todo-list'
 import { EventPlanner } from '@/components/event-planner'
-import ExportDropdown from '@/components/ExportDropdown'
+
+import { TimetableVariantSelector } from '@/components/TimetableVariantSelector'
 
 import toast from 'react-hot-toast'
+import axios from 'axios'
 
-export default function AdminDashboard() {
+function AdminDashboard() {
   const router = useRouter()
+  const auth = useAuth()
   const [currentView, setCurrentView] = useState('dashboard')
   const [showTodoList, setShowTodoList] = useState(false)
   const [showEventPlanner, setShowEventPlanner] = useState(false)
@@ -47,6 +51,9 @@ export default function AdminDashboard() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [variants, setVariants] = useState<any[]>([])
+  const [showVariantSelector, setShowVariantSelector] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
 
   // Original 9 Setup Modes
   const setupModes = [
@@ -171,36 +178,104 @@ export default function AdminDashboard() {
   }
 
   const handleGenerateTimetable = async () => {
+    setIsGenerating(true)
     try {
-      setIsGenerating(true)
-      toast.loading('Generating timetable with OR-Tools CP-SAT Solver...')
+      toast.loading('Generating multiple timetable variants with OR-Tools CP-SAT Solver...')
 
-      // Simulate timetable generation
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      const timetableData = {
-        institution: 'Demo Institution',
-        schedule: generateSampleSchedule(),
-        metadata: {
-          generated_at: new Date().toISOString(),
-          optimization_score: Math.floor(Math.random() * 20) + 80,
-          conflicts_resolved: Math.floor(Math.random() * 5),
-          total_sessions: 40
+      // Generate multiple variants
+      const response = await axios.post('http://localhost:8000/api/scheduler/generate-variants/', {
+        institution_id: 1,
+        name: 'Generated Timetable',
+        num_variants: 3
+      }, {
+        headers: {
+          'Authorization': `Bearer ${document.cookie.split('access_token=')[1]?.split(';')[0]}`
         }
+      })
+
+      toast.dismiss()
+
+      if (response.data.success) {
+        setVariants(response.data.variants)
+        setShowVariantSelector(true)
+        toast.success(`Generated ${response.data.successful_count} timetable variants!`)
+      } else {
+        toast.error('Failed to generate timetable variants')
       }
-
+    } catch (error: any) {
       toast.dismiss()
-      toast.success(`Timetable generated successfully! Optimization score: ${timetableData.metadata.optimization_score}%`)
-
-      // Store the generated timetable
-      localStorage.setItem('generatedTimetable', JSON.stringify(timetableData))
-      loadInitialData() // Reload data
-    } catch (error) {
-      toast.dismiss()
-      toast.error('Error generating timetable')
       console.error('Generation error:', error)
+      toast.error('Failed to generate timetable: ' + (error.response?.data?.message || error.message))
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleRegenerateVariants = async () => {
+    setIsRegenerating(true)
+    try {
+      const response = await axios.post('http://localhost:8000/api/scheduler/generate-variants/', {
+        institution_id: 1,
+        name: 'Regenerated Timetable',
+        num_variants: 3
+      }, {
+        headers: {
+          'Authorization': `Bearer ${document.cookie.split('access_token=')[1]?.split(';')[0]}`
+        }
+      })
+
+      if (response.data.success) {
+        setVariants(response.data.variants)
+        toast.success(`Regenerated ${response.data.successful_count} new variants!`)
+      } else {
+        toast.error('Failed to regenerate variants')
+      }
+    } catch (error: any) {
+      toast.error('Failed to regenerate variants: ' + (error.response?.data?.message || error.message))
+    } finally {
+      setIsRegenerating(false)
+    }
+  }
+
+  const handleSelectVariant = async (variant: any) => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/scheduler/commit-variant/', {
+        variant: variant,
+        name: `Timetable Variant ${variant.variant_id}`,
+        institution_id: 1
+      }, {
+        headers: {
+          'Authorization': `Bearer ${document.cookie.split('access_token=')[1]?.split(';')[0]}`
+        }
+      })
+
+      if (response.data.success) {
+        toast.success('Timetable variant committed successfully!')
+        setShowVariantSelector(false)
+        loadInitialData()
+
+        // Auto-download as PNG
+        setTimeout(() => {
+          const timetableElement = document.getElementById('timetable-grid')
+          if (timetableElement) {
+            import('@/lib/exportUtils').then(({ exportTimetableAsPNG }) => {
+              exportTimetableAsPNG('timetable-grid', {
+                filename: `timetable-variant-${variant.variant_id}`,
+                title: `Timetable Variant ${variant.variant_id}`,
+                institutionName: 'Demo Institution'
+              }).then(() => {
+                toast.success('Timetable automatically downloaded as PNG!')
+              }).catch(() => {
+                toast.error('Failed to auto-download timetable')
+              })
+            })
+          }
+        }, 1000)
+      } else {
+        toast.error('Failed to commit variant')
+      }
+    } catch (error: any) {
+      toast.error('Failed to commit variant: ' + (error.response?.data?.message || error.message))
     }
   }
 
@@ -329,8 +404,6 @@ export default function AdminDashboard() {
               <Edit className="w-4 h-4" />
               <span>Edit Timetable</span>
             </motion.button>
-
-            <ExportDropdown />
           </div>
         </motion.div>
 
@@ -574,6 +647,19 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Timetable Variant Selector Modal */}
+      <TimetableVariantSelector
+        variants={variants}
+        isOpen={showVariantSelector}
+        onClose={() => setShowVariantSelector(false)}
+        onSelectVariant={handleSelectVariant}
+        onRegenerateVariants={handleRegenerateVariants}
+        isRegenerating={isRegenerating}
+      />
     </div>
   )
 }
+
+// Export with auth guard
+export default withAuth(AdminDashboard, ['admin'])

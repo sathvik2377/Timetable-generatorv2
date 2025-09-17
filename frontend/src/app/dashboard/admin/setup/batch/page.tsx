@@ -19,10 +19,15 @@ import {
   Minus
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { generateTimetableVariants } from '@/lib/apiUtils'
+import { TimetableVariantSelector } from '@/components/TimetableVariantSelector'
 
 export default function BatchSetupPage() {
   const router = useRouter()
   const [isGenerating, setIsGenerating] = useState(false)
+  const [variants, setVariants] = useState<any[]>([])
+  const [showVariantSelector, setShowVariantSelector] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const [formData, setFormData] = useState({
     institutionName: '',
     institutionType: 'university',
@@ -91,42 +96,121 @@ export default function BatchSetupPage() {
   }
 
   const handleGenerate = async () => {
+    setIsGenerating(true)
     try {
-      setIsGenerating(true)
-      toast.loading('Processing batch setup for multiple campuses...')
-      
-      // Simulate batch processing
-      await new Promise(resolve => setTimeout(resolve, 4000))
-      
-      const totalBranches = formData.campuses.reduce((sum, campus) => sum + campus.branches, 0)
-      const totalStudents = formData.campuses.reduce((sum, campus) => sum + campus.students, 0)
-      
-      const timetableData = {
-        institution: formData.institutionName || 'Batch Institution',
-        type: formData.institutionType,
-        campuses: formData.campuses.length,
-        schedule: generateBatchSchedule(),
-        metadata: {
-          generated_at: new Date().toISOString(),
-          optimization_score: Math.floor(Math.random() * 15) + 85, // 85-100%
-          conflicts_resolved: Math.floor(Math.random() * 12) + 5,
-          total_branches: totalBranches,
-          total_students: totalStudents,
-          total_sessions: totalBranches * 8 * 5 // 8 subjects per branch, 5 days
+      toast.loading('Processing batch setup for multiple campuses with OR-Tools...')
+
+      // Generate multiple variants with Batch Setup data
+      const response = await generateTimetableVariants('batch', {
+        institution_id: 1,
+        name: `Batch Setup - ${formData.institutionName}`,
+        semester: 1,
+        num_variants: 3,
+        parameters: {
+          setup_mode: 'batch',
+          ...formData
         }
+      })
+
+      toast.dismiss()
+
+      if (response.data.success) {
+        setVariants(response.data.variants)
+        setShowVariantSelector(true)
+        toast.success(`Batch generated ${response.data.successful_count} timetable variants for ${formData.campuses.length} campuses!`)
+      } else {
+        toast.error('Failed to generate batch timetable variants')
       }
-      
+    } catch (error: any) {
       toast.dismiss()
-      toast.success(`Batch timetable generated for ${formData.campuses.length} campuses! Optimization: ${timetableData.metadata.optimization_score}%`)
-      
-      localStorage.setItem('generatedTimetable', JSON.stringify(timetableData))
-      router.push('/dashboard/admin')
-    } catch (error) {
-      toast.dismiss()
-      toast.error('Error in batch generation')
       console.error('Generation error:', error)
+      toast.error('Failed to generate batch timetable: ' + (error.response?.data?.message || error.message))
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleRegenerateVariants = async () => {
+    setIsRegenerating(true)
+    try {
+      const response = await generateTimetableVariants('batch', {
+        institution_id: 1,
+        name: `Batch Setup Regenerated - ${formData.institutionName}`,
+        semester: 1,
+        num_variants: 3,
+        parameters: {
+          setup_mode: 'batch',
+          regenerate: true,
+          ...formData
+        }
+      })
+
+      if (response.data.success) {
+        setVariants(response.data.variants)
+        toast.success(`Batch regenerated ${response.data.successful_count} new variants!`)
+      } else {
+        toast.error('Failed to regenerate variants')
+      }
+    } catch (error: any) {
+      toast.error('Failed to regenerate variants: ' + (error.response?.data?.message || error.message))
+    } finally {
+      setIsRegenerating(false)
+    }
+  }
+
+  const handleSelectVariant = async (variant: any) => {
+    try {
+      const response = await axios.post('http://localhost:8000/api/scheduler/commit-variant/', {
+        variant: variant,
+        name: `Batch Setup - ${formData.institutionName} - Variant ${variant.variant_id}`,
+        institution_id: 1
+      }, {
+        headers: {
+          'Authorization': `Bearer ${document.cookie.split('access_token=')[1]?.split(';')[0]}`
+        }
+      })
+
+      if (response.data.success) {
+        toast.success('Batch timetable variant committed successfully!')
+        setShowVariantSelector(false)
+
+        // Auto-download as PNG
+        setTimeout(() => {
+          import('@/lib/exportUtils').then(({ exportTimetableAsPNG }) => {
+            const tempDiv = document.createElement('div')
+            tempDiv.id = 'temp-batch-timetable-export'
+            tempDiv.innerHTML = `
+              <div style="padding: 20px; background: white; color: black;">
+                <h2>Batch Setup Multi-Campus Timetable - Variant ${variant.variant_id}</h2>
+                <p>Institution: ${formData.institutionName}</p>
+                <p>Campuses: ${formData.campuses.length}</p>
+                <p>Quality Score: ${variant.metrics.quality_score}%</p>
+                <p>Total Sessions: ${variant.metrics.total_sessions}</p>
+                <p>Generated: ${new Date().toLocaleString()}</p>
+              </div>
+            `
+            document.body.appendChild(tempDiv)
+
+            exportTimetableAsPNG('temp-batch-timetable-export', {
+              filename: `batch-setup-timetable-variant-${variant.variant_id}`,
+              title: `Batch Setup Multi-Campus Timetable - Variant ${variant.variant_id}`,
+              institutionName: formData.institutionName
+            }).then(() => {
+              toast.success('Batch timetable automatically downloaded as PNG!')
+              document.body.removeChild(tempDiv)
+            }).catch(() => {
+              toast.error('Failed to auto-download timetable')
+              document.body.removeChild(tempDiv)
+            })
+          })
+        }, 1000)
+
+        router.push('/dashboard/admin')
+      } else {
+        toast.error('Failed to commit variant')
+      }
+    } catch (error: any) {
+      toast.error('Failed to commit variant: ' + (error.response?.data?.message || error.message))
     }
   }
 
@@ -526,6 +610,16 @@ export default function BatchSetupPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Timetable Variant Selector Modal */}
+      <TimetableVariantSelector
+        variants={variants}
+        isOpen={showVariantSelector}
+        onClose={() => setShowVariantSelector(false)}
+        onSelectVariant={handleSelectVariant}
+        onRegenerateVariants={handleRegenerateVariants}
+        isRegenerating={isRegenerating}
+      />
     </div>
   )
 }

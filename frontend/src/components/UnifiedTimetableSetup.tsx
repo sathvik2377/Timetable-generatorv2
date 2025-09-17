@@ -62,13 +62,39 @@ interface TeacherData {
 }
 
 interface UnifiedTimetableSetupProps {
-  onComplete: (timetableData: any) => void
-  onCancel: () => void
+  currentStep?: number
+  setupData?: any
+  onStepComplete?: (stepData: any) => void
+  onGenerateTimetable?: () => void
+  isGenerating?: boolean
+  onComplete?: (timetableData: any) => void
+  onCancel?: () => void
 }
 
-export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedTimetableSetupProps) {
-  const [currentStep, setCurrentStep] = useState(0)
-  const [isGenerating, setIsGenerating] = useState(false)
+export default function UnifiedTimetableSetup({
+  currentStep: externalCurrentStep,
+  setupData: externalSetupData,
+  onStepComplete,
+  onGenerateTimetable,
+  isGenerating: externalIsGenerating,
+  onComplete,
+  onCancel
+}: UnifiedTimetableSetupProps) {
+  const [currentStep, setCurrentStep] = useState(externalCurrentStep || 0)
+  const [isGenerating, setIsGenerating] = useState(externalIsGenerating || false)
+
+  // Use external state when available
+  useEffect(() => {
+    if (externalCurrentStep !== undefined) {
+      setCurrentStep(externalCurrentStep)
+    }
+  }, [externalCurrentStep])
+
+  useEffect(() => {
+    if (externalIsGenerating !== undefined) {
+      setIsGenerating(externalIsGenerating)
+    }
+  }, [externalIsGenerating])
   const [instituteData, setInstituteData] = useState<InstituteData>({
     name: '',
     academicYear: '2024-25',
@@ -423,7 +449,18 @@ export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedT
 
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1)
+      const newStep = currentStep + 1
+      setCurrentStep(newStep)
+
+      // Call external onStepComplete if available
+      if (onStepComplete) {
+        onStepComplete({
+          step: newStep,
+          instituteData,
+          branches,
+          generatedTimetables
+        })
+      }
     }
   }
 
@@ -431,6 +468,66 @@ export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedT
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1)
     }
+  }
+
+  const loadSampleData = () => {
+    // Set institute data
+    setInstituteData({
+      name: 'Bharatiya Shiksha Sansthan',
+      academicYear: '2024-25',
+      semester: 1,
+      numberOfBranches: 3
+    })
+
+    // Set sample branches
+    const sampleBranches = [
+      {
+        name: 'Computer Science',
+        code: 'CS',
+        numberOfSubjects: 4,
+        numberOfSections: 2,
+        subjects: [
+          { name: 'Data Structures', code: 'CS101', credits: 4, type: 'core' },
+          { name: 'Algorithms', code: 'CS102', credits: 4, type: 'core' },
+          { name: 'Database Systems', code: 'CS201', credits: 3, type: 'core' },
+          { name: 'Web Development', code: 'CS301', credits: 3, type: 'elective' }
+        ],
+        teachers: [
+          { name: 'Dr. Vikram Agarwal', email: 'vikram@college.edu.in', phone: '+91-9876543210', subjectAssigned: 'Data Structures' },
+          { name: 'Prof. Kavita Joshi', email: 'kavita@college.edu.in', phone: '+91-9876543211', subjectAssigned: 'Algorithms' }
+        ]
+      },
+      {
+        name: 'Mathematics',
+        code: 'MATH',
+        numberOfSubjects: 3,
+        numberOfSections: 1,
+        subjects: [
+          { name: 'Calculus I', code: 'MATH101', credits: 4, type: 'core' },
+          { name: 'Linear Algebra', code: 'MATH102', credits: 3, type: 'core' },
+          { name: 'Statistics', code: 'MATH201', credits: 3, type: 'elective' }
+        ],
+        teachers: [
+          { name: 'Dr. Suresh Reddy', email: 'suresh@college.edu.in', phone: '+91-9876543212', subjectAssigned: 'Calculus I' }
+        ]
+      },
+      {
+        name: 'Physics',
+        code: 'PHY',
+        numberOfSubjects: 2,
+        numberOfSections: 1,
+        subjects: [
+          { name: 'Mechanics', code: 'PHY101', credits: 4, type: 'core' },
+          { name: 'Thermodynamics', code: 'PHY102', credits: 3, type: 'core' }
+        ],
+        teachers: [
+          { name: 'Prof. Anita Verma', email: 'anita@college.edu.in', phone: '+91-9876543213', subjectAssigned: 'Mechanics' }
+        ]
+      }
+    ]
+
+    setBranches(sampleBranches)
+    toast.success('Complete sample data loaded!')
   }
 
   const canProceed = () => {
@@ -458,18 +555,18 @@ export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedT
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <School className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <School className="w-16 h-16 text-purple-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-2">
                 Institute Information
               </h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-gray-300">
                 Enter your institute details to begin the setup process
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Institute Name *
                 </label>
                 <input
@@ -477,18 +574,18 @@ export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedT
                   value={instituteData.name}
                   onChange={(e) => setInstituteData({...instituteData, name: e.target.value})}
                   placeholder="e.g., Indian Institute of Technology Delhi"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-4 py-3 glass-card border border-purple-500/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Academic Year *
                 </label>
                 <select
                   value={instituteData.academicYear}
                   onChange={(e) => setInstituteData({...instituteData, academicYear: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-4 py-3 glass-card border border-purple-500/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="2024-25">2024-25</option>
                   <option value="2025-26">2025-26</option>
@@ -527,6 +624,29 @@ export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedT
               </div>
             </div>
 
+            {/* Sample Data Buttons */}
+            <div className="text-center space-x-4">
+              <button
+                onClick={loadSampleData}
+                className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-2 rounded-lg hover:from-purple-600 hover:to-blue-600 transition-colors"
+              >
+                <Sparkles className="w-4 h-4 inline mr-2" />
+                Load Complete Sample Data
+              </button>
+
+              <button
+                onClick={() => {
+                  // Open sample timetable in new tab
+                  window.open('/demo-interactive', '_blank');
+                  toast.success('Opening sample timetable in new tab');
+                }}
+                className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-6 py-2 rounded-lg hover:from-blue-600 hover:to-cyan-700 transition-colors"
+              >
+                <Eye className="w-4 h-4 inline mr-2" />
+                Show Sample Timetable
+              </button>
+            </div>
+
             {instituteData.numberOfBranches > 0 && (
               <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center mb-2">
@@ -547,19 +667,19 @@ export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedT
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <GraduationCap className="w-16 h-16 text-purple-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              <GraduationCap className="w-16 h-16 text-purple-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-2">
                 Branch Configuration
               </h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-gray-300">
                 Configure each academic branch with subjects and sections
               </p>
             </div>
 
             <div className="space-y-8">
               {branches.map((branch, index) => (
-                <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-6 bg-gray-50 dark:bg-gray-700">
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                <div key={index} className="glass-card border border-purple-500/30 rounded-lg p-6">
+                  <h4 className="text-lg font-semibold text-white mb-4">
                     Branch {index + 1}
                   </h4>
 
@@ -1199,21 +1319,21 @@ export default function UnifiedTimetableSetup({ onComplete, onCancel }: UnifiedT
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="w-full">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="glass-card rounded-2xl w-full overflow-hidden"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+        <div className="bg-gradient-to-r from-purple-600 to-violet-600 text-white p-6">
           <div className="flex items-center justify-center mb-4">
-            <Sparkles className="w-8 h-8 text-blue-200 mr-3" />
+            <Sparkles className="w-8 h-8 text-purple-200 mr-3" />
             <h2 className="text-2xl font-bold">Smart Timetable Setup & Generation</h2>
-            <Brain className="w-8 h-8 text-purple-200 ml-3" />
+            <Brain className="w-8 h-8 text-violet-200 ml-3" />
           </div>
-          <p className="text-blue-100 text-center">Complete setup and intelligent timetable generation in one flow</p>
+          <p className="text-purple-100 text-center">Complete setup and intelligent timetable generation in one flow</p>
         </div>
 
         {/* Progress Bar */}

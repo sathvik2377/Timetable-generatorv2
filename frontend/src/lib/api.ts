@@ -83,7 +83,7 @@ class ApiClient {
 
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await this.client.post('/api/users/dev-login/', credentials)
+    const response = await this.client.post('/api/auth/token/', credentials)
     return response.data
   }
 

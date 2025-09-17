@@ -3,23 +3,30 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { 
-  ArrowLeft, 
-  Edit3, 
-  Plus, 
-  Trash2, 
+import {
+  ArrowLeft,
+  Edit3,
+  Plus,
+  Trash2,
   Save,
   CheckCircle,
   AlertCircle,
   Database,
   Utensils,
-  Clock
+  Clock,
+  Eye
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { TimetableVariantSelector } from '@/components/TimetableVariantSelector'
+import { withAuth } from '@/lib/auth'
+import { generateTimetableVariants } from '@/lib/apiUtils'
 
-export default function SimpleCreatorPage() {
+function SimpleCreatorPage() {
   const router = useRouter()
   const [isGenerating, setIsGenerating] = useState(false)
+  const [variants, setVariants] = useState<any[]>([])
+  const [showVariantSelector, setShowVariantSelector] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const [formData, setFormData] = useState({
     institutionName: '',
     startTime: '09:00',
@@ -111,26 +118,95 @@ export default function SimpleCreatorPage() {
     )
   }
 
-  const generateTimetable = () => {
-    const newTimetable = formData.timeSlots.map((time, timeIndex) => {
-      const row: any = { Time: time }
-      
-      if (time.includes('12:00') || time.includes('13:00')) {
-        days.forEach(day => {
-          row[day] = 'LUNCH BREAK'
-        })
+  const generateTimetable = async () => {
+    setIsGenerating(true)
+    try {
+      toast.loading('Generating simple timetable variants with OR-Tools...')
+
+      const response = await generateTimetableVariants('simple_creator', {
+        institution_id: 1,
+        name: `Simple Creator - ${formData.institutionName || 'Untitled'}`,
+        semester: 1,
+        num_variants: 3,
+        parameters: {
+          setup_mode: 'simple_creator',
+          ...formData
+        }
+      })
+
+      if (response.data.variants && response.data.variants.length > 0) {
+        setVariants(response.data.variants)
+        setShowVariantSelector(true)
+        toast.dismiss()
+        toast.success(`Generated ${response.data.variants.length} timetable variants!`)
       } else {
-        days.forEach((day, dayIndex) => {
-          const subjectIndex = (timeIndex + dayIndex) % formData.subjects.length
-          row[day] = formData.subjects[subjectIndex]
-        })
+        toast.error('No valid timetable variants could be generated')
       }
-      
-      return row
-    })
-    
-    setTimetable(newTimetable)
-    toast.success('Timetable generated successfully!')
+    } catch (error: any) {
+      console.error('Timetable generation error:', error)
+      toast.error(error.response?.data?.error || 'Failed to generate timetable')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleSelectVariant = async (variant: any) => {
+    try {
+      toast.loading('Committing selected timetable variant...')
+
+      const token = document.cookie.split('access_token=')[1]?.split(';')[0]
+      const response = await axios.post('http://localhost:8000/api/scheduler/commit-variant/', {
+        variant: variant,
+        name: `Simple Creator - Variant ${variant.variant_id}`,
+        institution_id: 1
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.data.success) {
+        toast.dismiss()
+        toast.success('Timetable variant committed successfully!')
+
+        // Auto-download as PNG
+        if (response.data.download_url) {
+          const link = document.createElement('a')
+          link.href = response.data.download_url
+          link.download = `simple_creator_timetable_${new Date().toISOString().split('T')[0]}.png`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        }
+
+        setShowVariantSelector(false)
+        router.push('/dashboard/admin')
+      }
+    } catch (error: any) {
+      console.error('Commit variant error:', error)
+      toast.error(error.response?.data?.error || 'Failed to commit timetable variant')
+    }
+  }
+
+  const handleRegenerateVariants = async () => {
+    setIsRegenerating(true)
+    try {
+      toast.loading('Regenerating timetable variants...')
+
+      const response = await generateTimetableVariants('simple_creator', { ...formData, regenerate: true })
+
+      if (response.data.variants && response.data.variants.length > 0) {
+        setVariants(response.data.variants)
+        toast.dismiss()
+        toast.success(`Regenerated ${response.data.variants.length} new variants!`)
+      }
+    } catch (error: any) {
+      console.error('Regenerate variants error:', error)
+      toast.error(error.response?.data?.error || 'Failed to regenerate variants')
+    } finally {
+      setIsRegenerating(false)
+    }
   }
 
   const handleSave = async () => {
@@ -206,6 +282,20 @@ export default function SimpleCreatorPage() {
             >
               <Database className="w-4 h-4" />
               <span>Use Sample Data</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                // Open sample timetable in new tab
+                window.open('/demo-interactive', '_blank');
+                toast.success('Opening sample timetable in new tab');
+              }}
+              className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors"
+            >
+              <Eye className="w-4 h-4" />
+              <span>Show Sample Timetable</span>
             </motion.button>
 
             <motion.button
@@ -462,6 +552,18 @@ export default function SimpleCreatorPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Timetable Variant Selector Modal */}
+      <TimetableVariantSelector
+        variants={variants}
+        isOpen={showVariantSelector}
+        onClose={() => setShowVariantSelector(false)}
+        onSelectVariant={handleSelectVariant}
+        onRegenerateVariants={handleRegenerateVariants}
+        isRegenerating={isRegenerating}
+      />
     </div>
   )
 }
+
+export default withAuth(SimpleCreatorPage, ['admin'])

@@ -88,6 +88,22 @@ export default function AdminEditTimetablePage() {
   const [draggedItem, setDraggedItem] = useState<any>(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showAddClassModal, setShowAddClassModal] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<{day: string, timeSlot: string} | null>(null);
+  const [newClass, setNewClass] = useState({
+    subject: '',
+    teacher: '',
+    room: '',
+    type: 'theory' as 'theory' | 'practical' | 'tutorial',
+    students: 30
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState([
+    { id: 'standard', name: 'Standard Template', description: 'Basic 6-day schedule with common subjects' },
+    { id: 'intensive', name: 'Intensive Template', description: 'High-density schedule with more hours per day' },
+    { id: 'balanced', name: 'Balanced Template', description: 'Optimized for work-life balance' }
+  ]);
 
   const timeSlots = ['09:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00', '14:00-15:00', '15:00-16:00'];
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -250,6 +266,42 @@ export default function AdminEditTimetablePage() {
     setHasChanges(true);
   };
 
+  const handleAddClass = (day: string, timeSlot: string) => {
+    setSelectedSlot({ day, timeSlot });
+    setNewClass({
+      subject: '',
+      teacher: '',
+      room: '',
+      type: 'theory',
+      students: 30
+    });
+    setShowAddClassModal(true);
+  };
+
+  const handleSaveNewClass = () => {
+    if (!selectedSlot || !newClass.subject.trim() || !newClass.teacher.trim()) {
+      alert('Please fill in all required fields (Subject and Teacher)');
+      return;
+    }
+
+    const newTimetables = { ...timetables };
+    const newSlot: TimetableSlot = {
+      id: `${selectedSlot.day}-${selectedSlot.timeSlot}-${Date.now()}`,
+      subject: newClass.subject,
+      teacher: newClass.teacher,
+      room: newClass.room || 'TBD',
+      type: newClass.type,
+      students: newClass.students,
+      branchId: selectedBranch
+    };
+
+    newTimetables[selectedBranch][selectedSlot.day][selectedSlot.timeSlot] = newSlot;
+    setTimetables(newTimetables);
+    setHasChanges(true);
+    setShowAddClassModal(false);
+    setSelectedSlot(null);
+  };
+
   const handleSave = async () => {
     setIsAnalyzing(true);
     // Simulate save operation
@@ -355,6 +407,162 @@ export default function AdminEditTimetablePage() {
     });
     
     return csv;
+  };
+
+  // Auto-generate timetable functionality
+  const autoGenerateTimetable = async () => {
+    setIsGenerating(true);
+    try {
+      // Simulate API call to generate timetable
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const currentBranch = branches.find(b => b.id === selectedBranch);
+      if (!currentBranch) return;
+
+      const newTimetable: { [day: string]: { [timeSlot: string]: TimetableSlot | null } } = {};
+
+      // Initialize empty timetable
+      days.forEach(day => {
+        newTimetable[day] = {};
+        timeSlots.forEach(slot => {
+          newTimetable[day][slot] = null;
+        });
+      });
+
+      // Simple algorithm to distribute subjects
+      let subjectIndex = 0;
+      let teacherIndex = 0;
+
+      days.forEach((day, dayIndex) => {
+        timeSlots.forEach((slot, slotIndex) => {
+          // Skip lunch break
+          if (slot === '13:00-14:00') {
+            newTimetable[day][slot] = {
+              id: `break-${dayIndex}-${slotIndex}`,
+              subject: 'Lunch Break',
+              teacher: '',
+              room: '',
+              type: 'break',
+              students: 0,
+              branchId: selectedBranch
+            };
+            return;
+          }
+
+          const subject = currentBranch.subjects[subjectIndex % currentBranch.subjects.length];
+          const teacher = currentBranch.teachers[teacherIndex % currentBranch.teachers.length];
+
+          newTimetable[day][slot] = {
+            id: `${selectedBranch}-${dayIndex}-${slotIndex}`,
+            subject: subject.name,
+            teacher: teacher.name,
+            room: `Room ${Math.floor(Math.random() * 10) + 101}`,
+            type: subject.type,
+            students: currentBranch.totalStudents,
+            branchId: selectedBranch
+          };
+
+          subjectIndex++;
+          if (subjectIndex % 2 === 0) teacherIndex++;
+        });
+      });
+
+      setTimetables(prev => ({
+        ...prev,
+        [selectedBranch]: newTimetable
+      }));
+
+      setHasChanges(true);
+      analyzeConflicts();
+
+    } catch (error) {
+      console.error('Failed to generate timetable:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Clear all slots functionality
+  const clearAllSlots = () => {
+    const emptyTimetable: { [day: string]: { [timeSlot: string]: TimetableSlot | null } } = {};
+
+    days.forEach(day => {
+      emptyTimetable[day] = {};
+      timeSlots.forEach(slot => {
+        if (slot === '13:00-14:00') {
+          emptyTimetable[day][slot] = {
+            id: `break-${day}-${slot}`,
+            subject: 'Lunch Break',
+            teacher: '',
+            room: '',
+            type: 'break',
+            students: 0,
+            branchId: selectedBranch
+          };
+        } else {
+          emptyTimetable[day][slot] = null;
+        }
+      });
+    });
+
+    setTimetables(prev => ({
+      ...prev,
+      [selectedBranch]: emptyTimetable
+    }));
+
+    setHasChanges(true);
+    setConflicts([]);
+  };
+
+  // Apply template functionality
+  const applyTemplate = (templateId: string) => {
+    const currentBranch = branches.find(b => b.id === selectedBranch);
+    if (!currentBranch) return;
+
+    const newTimetable: { [day: string]: { [timeSlot: string]: TimetableSlot | null } } = {};
+
+    // Initialize with lunch breaks
+    days.forEach(day => {
+      newTimetable[day] = {};
+      timeSlots.forEach(slot => {
+        if (slot === '13:00-14:00') {
+          newTimetable[day][slot] = {
+            id: `break-${day}-${slot}`,
+            subject: 'Lunch Break',
+            teacher: '',
+            room: '',
+            type: 'break',
+            students: 0,
+            branchId: selectedBranch
+          };
+        } else {
+          // Apply template pattern
+          const subjectIndex = timeSlots.indexOf(slot) % currentBranch.subjects.length;
+          const teacherIndex = Math.floor(timeSlots.indexOf(slot) / 2) % currentBranch.teachers.length;
+          const subject = currentBranch.subjects[subjectIndex];
+          const teacher = currentBranch.teachers[teacherIndex];
+
+          newTimetable[day][slot] = {
+            id: `${selectedBranch}-${day}-${slot}`,
+            subject: subject.name,
+            teacher: teacher.name,
+            room: `Room ${Math.floor(Math.random() * 10) + 101}`,
+            type: subject.type,
+            students: currentBranch.totalStudents,
+            branchId: selectedBranch
+          };
+        }
+      });
+    });
+
+    setTimetables(prev => ({
+      ...prev,
+      [selectedBranch]: newTimetable
+    }));
+
+    setHasChanges(true);
+    setShowTemplateModal(false);
+    analyzeConflicts();
   };
 
   const getSlotColor = (type: string) => {
@@ -489,14 +697,36 @@ export default function AdminEditTimetablePage() {
           >
             <h3 className="text-lg font-bold text-high-contrast mb-4">Quick Actions</h3>
             <div className="space-y-2">
-              <button className="w-full px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 transition-all text-left text-blue-400">
-                Auto-Generate Timetable
+              <button
+                onClick={autoGenerateTimetable}
+                disabled={isGenerating}
+                className="w-full px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 transition-all text-left text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    Auto-Generate Timetable
+                  </>
+                )}
               </button>
-              <button className="w-full px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-lg hover:bg-purple-500/30 transition-all text-left text-purple-400">
+              <button
+                onClick={clearAllSlots}
+                className="w-full px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-lg hover:bg-purple-500/30 transition-all text-left text-purple-400 flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
                 Clear All Slots
               </button>
-              <button className="w-full px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg hover:bg-green-500/30 transition-all text-left text-green-400">
-                Copy from Template
+              <button
+                onClick={() => setShowTemplateModal(true)}
+                className="w-full px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg hover:bg-green-500/30 transition-all text-left text-green-400 flex items-center gap-2"
+              >
+                <Building2 className="w-4 h-4" />
+                Use Template
               </button>
             </div>
           </motion.div>
@@ -619,6 +849,7 @@ export default function AdminEditTimetablePage() {
                               className="h-20 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 hover:border-blue-400 hover:text-blue-400 transition-colors cursor-pointer"
                               onDragOver={handleDragOver}
                               onDrop={(e) => handleDrop(e, day, timeSlot)}
+                              onClick={() => handleAddClass(day, timeSlot)}
                             >
                               <Plus className="h-6 w-6" />
                               <span className="ml-2 text-sm">Add Class</span>
@@ -657,6 +888,145 @@ export default function AdminEditTimetablePage() {
             </div>
           </div>
         </motion.div>
+
+        {/* Add Class Modal */}
+        {showAddClassModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="glass-card rounded-lg p-6 w-full max-w-md mx-4"
+            >
+              <h3 className="text-xl font-bold text-high-contrast mb-4">
+                Add New Class
+              </h3>
+              <p className="text-sm text-readable mb-4">
+                {selectedSlot && `${selectedSlot.day} at ${selectedSlot.timeSlot}`}
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-readable mb-1">
+                    Subject *
+                  </label>
+                  <input
+                    type="text"
+                    value={newClass.subject}
+                    onChange={(e) => setNewClass({...newClass, subject: e.target.value})}
+                    className="w-full px-3 py-2 glass border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-high-contrast"
+                    placeholder="Enter subject name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-readable mb-1">
+                    Teacher *
+                  </label>
+                  <input
+                    type="text"
+                    value={newClass.teacher}
+                    onChange={(e) => setNewClass({...newClass, teacher: e.target.value})}
+                    className="w-full px-3 py-2 glass border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-high-contrast"
+                    placeholder="Enter teacher name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-readable mb-1">
+                    Room
+                  </label>
+                  <input
+                    type="text"
+                    value={newClass.room}
+                    onChange={(e) => setNewClass({...newClass, room: e.target.value})}
+                    className="w-full px-3 py-2 glass border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-high-contrast"
+                    placeholder="Enter room number"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-readable mb-1">
+                    Type
+                  </label>
+                  <select
+                    value={newClass.type}
+                    onChange={(e) => setNewClass({...newClass, type: e.target.value as 'theory' | 'practical' | 'tutorial'})}
+                    className="w-full px-3 py-2 glass border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-high-contrast"
+                  >
+                    <option value="theory">Theory</option>
+                    <option value="practical">Practical</option>
+                    <option value="tutorial">Tutorial</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-readable mb-1">
+                    Students
+                  </label>
+                  <input
+                    type="number"
+                    value={newClass.students}
+                    onChange={(e) => setNewClass({...newClass, students: parseInt(e.target.value) || 30})}
+                    className="w-full px-3 py-2 glass border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-high-contrast"
+                    min="1"
+                    max="100"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleSaveNewClass}
+                  className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
+                >
+                  Add Class
+                </button>
+                <button
+                  onClick={() => setShowAddClassModal(false)}
+                  className="flex-1 glass-button px-4 py-2 rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Template Selection Modal */}
+        {showTemplateModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="glass border-0 rounded-lg p-6 w-full max-w-md"
+            >
+              <h2 className="text-xl font-bold text-high-contrast mb-4">Choose Template</h2>
+              <p className="text-readable mb-6">Select a template to apply to the current branch timetable.</p>
+
+              <div className="space-y-3">
+                {availableTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => applyTemplate(template.id)}
+                    className="w-full p-4 text-left glass-card hover:bg-glass-hover transition-all rounded-lg border border-glass-border"
+                  >
+                    <h3 className="font-semibold text-primary">{template.name}</h3>
+                    <p className="text-sm text-muted mt-1">{template.description}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowTemplateModal(false)}
+                  className="flex-1 glass-button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   );

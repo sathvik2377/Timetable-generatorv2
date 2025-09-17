@@ -56,13 +56,13 @@ export default function HomePage() {
               </motion.button>
             </Link>
 
-            <Link href="/demo-interactive">
+            <Link href="/how-to-use">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="glass-button text-sm"
               >
-                Interactive Demo
+                How to Use
               </motion.button>
             </Link>
 
@@ -110,6 +110,23 @@ export default function HomePage() {
               <Calendar className="w-4 h-4 inline mr-2" />
               Multi-format Export
             </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="mb-8"
+          >
+            <Link href="/how-to-use">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
+              >
+                📚 Complete Guide & Setup Instructions
+              </motion.button>
+            </Link>
           </motion.div>
         </div>
 

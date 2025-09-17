@@ -52,10 +52,10 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gradient-from via-gradient-via to-gradient-to flex items-center justify-center">
         <div className="glass-card p-8 text-center">
           <div className="spinner mx-auto mb-4" />
-          <p className="text-white">Loading...</p>
+          <p className="text-primary">Loading...</p>
         </div>
       </div>
     )
@@ -66,12 +66,12 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <DashboardNav 
+    <div className="min-h-screen bg-gradient-to-br from-gradient-from via-gradient-via to-gradient-to">
+      <DashboardNav
         userRole={user.role}
         userName={user.display_name || `${user.first_name} ${user.last_name}`}
       />
-      
+
       {/* Main Content */}
       <div className="lg:pl-64">
         {children}

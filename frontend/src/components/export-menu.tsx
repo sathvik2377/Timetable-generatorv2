@@ -74,7 +74,7 @@ export function ExportMenu({ timetableId, institutionId, timetable, type = 'time
 
   const handleExport = async (format: string) => {
     if (!timetable && !timetableId) {
-      toast.error('No timetable data available for export')
+      toast.error('Please generate a timetable first')
       return
     }
 
@@ -232,7 +232,7 @@ export function QuickExportButton({ timetableId, format = 'pdf', className = '' 
 
   const handleQuickExport = async () => {
     if (!timetableId) {
-      toast.error('No timetable selected')
+      toast.error('Please generate a timetable first')
       return
     }
 

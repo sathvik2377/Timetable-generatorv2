@@ -26,9 +26,9 @@ export default function LoginPage() {
   // Set default credentials based on role
   useEffect(() => {
     const defaultCredentials = {
-      admin: { email: 'admin@demo.local', password: 'Admin@1234' },
-      faculty: { email: 'john.smith@demo.local', password: 'Faculty@123' },
-      student: { email: 'alice.wilson@demo.local', password: 'Student@123' }
+      admin: { email: 'admin@demo.local', password: 'demo123' },
+      faculty: { email: 'anita@college.edu.in', password: 'demo123' },
+      student: { email: 'student@demo.local', password: 'demo123' }
     }
 
     const defaults = defaultCredentials[role as keyof typeof defaultCredentials] || defaultCredentials.admin
@@ -42,20 +42,29 @@ export default function LoginPage() {
     setError('')
 
     try {
-      // Directly use axios to POST both fields
-      const response = await axios.post('http://localhost:8000/api/users/dev-login/', {
+      // Use JWT token endpoint
+      const response = await axios.post('http://localhost:8000/api/auth/token/', {
         email: formData.email,
         password: formData.password
       })
 
-      // Store tokens
-      Cookies.set('access_token', response.data.tokens.access, { expires: 1 })
-      Cookies.set('refresh_token', response.data.tokens.refresh, { expires: 7 })
+      // Store tokens (JWT endpoint returns access and refresh directly)
+      Cookies.set('access_token', response.data.access, { expires: 1 })
+      Cookies.set('refresh_token', response.data.refresh, { expires: 7 })
 
-      // Store user data
-      localStorage.setItem('user', JSON.stringify(response.data.user))
+      // Create user object from token (we'll need to get user data separately)
+      const userRole = formData.email.includes('admin') ? 'admin' :
+                      formData.email.includes('faculty') ? 'faculty' : 'student'
+      const userData = {
+        id: 1,
+        email: formData.email,
+        role: userRole,
+        first_name: userRole.charAt(0).toUpperCase() + userRole.slice(1),
+        last_name: 'User'
+      }
+      localStorage.setItem('user', JSON.stringify(userData))
 
-      toast.success(`Welcome back, ${response.data.user.first_name}!`)
+      toast.success(`Welcome back, ${userData.first_name}!`)
 
       // Redirect based on role
       const redirectMap: Record<'admin' | 'faculty' | 'student', string> = {
@@ -63,7 +72,6 @@ export default function LoginPage() {
         faculty: '/dashboard/faculty',
         student: '/dashboard/student'
       }
-      const userRole = response.data.user.role as 'admin' | 'faculty' | 'student'
       const redirectPath = redirectMap[userRole] || '/dashboard'
 
       router.push(redirectPath)

@@ -107,7 +107,7 @@ export default function ExportDropdown({
   const exportAsPNG = async () => {
     const element = document.getElementById(elementId)
     if (!element) {
-      throw new Error('Timetable element not found')
+      throw new Error('Please generate a timetable first')
     }
 
     const canvas = await html2canvas(element, {
@@ -126,7 +126,7 @@ export default function ExportDropdown({
   const exportAsPDF = async () => {
     const element = document.getElementById(elementId)
     if (!element) {
-      throw new Error('Timetable element not found')
+      throw new Error('Please generate a timetable first')
     }
 
     const canvas = await html2canvas(element, {

@@ -18,10 +18,16 @@ import {
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { apiClient } from '@/lib/api'
+import { generateTimetableVariants, commitTimetableVariant } from '@/lib/apiUtils'
+import { TimetableVariantSelector } from '@/components/TimetableVariantSelector'
+import SetupLayout from '@/components/SetupLayout'
 
 export default function QuickSetupPage() {
   const router = useRouter()
   const [isGenerating, setIsGenerating] = useState(false)
+  const [variants, setVariants] = useState<any[]>([])
+  const [showVariantSelector, setShowVariantSelector] = useState(false)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const [formData, setFormData] = useState({
     institutionName: '',
     institutionType: 'school',
@@ -61,38 +67,125 @@ export default function QuickSetupPage() {
   }
 
   const handleGenerate = async () => {
+    setIsGenerating(true)
     try {
-      setIsGenerating(true)
-      toast.loading('Generating timetable with OR-Tools CP-SAT Solver...')
-      
-      // Create realistic timetable data
-      const timetableData = {
-        institution: formData.institutionName || 'Demo Institution',
+      toast.loading('Generating multiple timetable variants with OR-Tools CP-SAT Solver...')
+
+      // First create/update institution with form data
+      const institutionData = {
+        name: formData.institutionName || 'Demo Institution',
         type: formData.institutionType,
-        schedule: generateRealisticSchedule(),
-        metadata: {
-          generated_at: new Date().toISOString(),
-          optimization_score: Math.floor(Math.random() * 20) + 80, // 80-100%
-          conflicts_resolved: Math.floor(Math.random() * 5),
-          total_sessions: formData.subjects * formData.branches * 5 // 5 days
-        }
+        start_time: formData.startTime,
+        end_time: formData.endTime,
+        lunch_break_start: formData.lunchStart,
+        lunch_break_end: formData.lunchEnd,
+        working_days: formData.workingDays,
+        slot_duration: 60 // 1 hour slots
       }
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
+
+      // Generate multiple variants
+      const response = await generateTimetableVariants('quick', {
+        institution_id: 1,
+        name: `Quick Setup - ${formData.institutionName}`,
+        semester: 1,
+        num_variants: 3,
+        parameters: {
+          setup_mode: 'quick',
+          ...formData
+        }
+      })
+
       toast.dismiss()
-      toast.success(`Timetable generated successfully! Optimization score: ${timetableData.metadata.optimization_score}%`)
-      
-      // Store the generated timetable
-      localStorage.setItem('generatedTimetable', JSON.stringify(timetableData))
-      router.push('/dashboard/admin')
-    } catch (error) {
+
+      if (response.data.success) {
+        setVariants(response.data.variants)
+        setShowVariantSelector(true)
+        toast.success(`Generated ${response.data.successful_count} timetable variants using Quick Setup!`)
+      } else {
+        toast.error('Failed to generate timetable variants')
+      }
+    } catch (error: any) {
       toast.dismiss()
-      toast.error('Error generating timetable')
       console.error('Generation error:', error)
+      toast.error('Failed to generate timetable: ' + (error.response?.data?.message || error.message))
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  const handleRegenerateVariants = async () => {
+    setIsRegenerating(true)
+    try {
+      const response = await generateTimetableVariants('quick', {
+        institution_id: 1,
+        name: `Quick Setup Regenerated - ${formData.institutionName}`,
+        semester: 1,
+        num_variants: 3,
+        parameters: {
+          setup_mode: 'quick',
+          regenerate: true,
+          ...formData
+        }
+      })
+
+      if (response.data.success) {
+        setVariants(response.data.variants)
+        toast.success(`Regenerated ${response.data.successful_count} new variants!`)
+      } else {
+        toast.error('Failed to regenerate variants')
+      }
+    } catch (error: any) {
+      toast.error('Failed to regenerate variants: ' + (error.response?.data?.message || error.message))
+    } finally {
+      setIsRegenerating(false)
+    }
+  }
+
+  const handleSelectVariant = async (variant: any) => {
+    try {
+      const response = await commitTimetableVariant(variant.variant_id, 'quick')
+
+      if (response.data.success) {
+        toast.success('Timetable variant committed successfully!')
+        setShowVariantSelector(false)
+
+        // Auto-download as PNG
+        setTimeout(() => {
+          import('@/lib/exportUtils').then(({ exportTimetableAsPNG }) => {
+            // Create a temporary timetable element for export
+            const tempDiv = document.createElement('div')
+            tempDiv.id = 'temp-timetable-export'
+            tempDiv.innerHTML = `
+              <div style="padding: 20px; background: white; color: black;">
+                <h2>Quick Setup Timetable - Variant ${variant.variant_id}</h2>
+                <p>Institution: ${formData.institutionName}</p>
+                <p>Quality Score: ${variant.metrics.quality_score}%</p>
+                <p>Total Sessions: ${variant.metrics.total_sessions}</p>
+                <p>Generated: ${new Date().toLocaleString()}</p>
+              </div>
+            `
+            document.body.appendChild(tempDiv)
+
+            exportTimetableAsPNG('temp-timetable-export', {
+              filename: `quick-setup-timetable-variant-${variant.variant_id}`,
+              title: `Quick Setup Timetable - Variant ${variant.variant_id}`,
+              institutionName: formData.institutionName
+            }).then(() => {
+              toast.success('Timetable automatically downloaded as PNG!')
+              document.body.removeChild(tempDiv)
+            }).catch(() => {
+              toast.error('Failed to auto-download timetable')
+              document.body.removeChild(tempDiv)
+            })
+          })
+        }, 1000)
+
+        router.push('/dashboard/admin')
+      } else {
+        toast.error('Failed to commit variant')
+      }
+    } catch (error: any) {
+      toast.error('Failed to commit variant: ' + (error.response?.data?.message || error.message))
     }
   }
 
@@ -128,45 +221,22 @@ export default function QuickSetupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
+    <SetupLayout
+      title="Quick Setup"
+      description="Fast setup for small institutions with basic requirements"
+      icon={<Zap className="w-6 h-6 text-white" />}
+      headerActions={
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleUseSampleData}
+          className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors"
         >
-          <div className="flex items-center space-x-4">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => router.back()}
-              className="glass-card p-3 text-white hover:bg-white/10 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </motion.button>
-            
-            <div>
-              <div className="flex items-center space-x-3 mb-2">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-                  <Zap className="w-6 h-6 text-white" />
-                </div>
-                <h1 className="text-3xl font-bold text-white">Quick Setup</h1>
-              </div>
-              <p className="text-gray-300">Fast setup for small institutions with basic requirements</p>
-            </div>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleUseSampleData}
-            className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 transition-colors"
-          >
-            <Database className="w-4 h-4" />
-            <span>Use Sample Data</span>
-          </motion.button>
-        </motion.div>
+          <Database className="w-4 h-4" />
+          <span>Use Sample Data</span>
+        </motion.button>
+      }
+    >
 
         {/* Form */}
         <motion.div
@@ -384,7 +454,16 @@ export default function QuickSetupPage() {
             </div>
           </div>
         </motion.div>
-      </div>
-    </div>
+
+      {/* Timetable Variant Selector Modal */}
+      <TimetableVariantSelector
+        variants={variants}
+        isOpen={showVariantSelector}
+        onClose={() => setShowVariantSelector(false)}
+        onSelectVariant={handleSelectVariant}
+        onRegenerateVariants={handleRegenerateVariants}
+        isRegenerating={isRegenerating}
+      />
+    </SetupLayout>
   )
 }

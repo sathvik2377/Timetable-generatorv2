@@ -156,16 +156,16 @@ export function DashboardNav({ userRole, userName }: DashboardNavProps) {
     <>
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-50">
-        <div className="flex flex-col flex-grow bg-black/20 backdrop-blur-lg border-r border-white/10">
+        <div className="flex flex-col flex-grow glass-card border-r border-glass-border">
           {/* Logo/Brand */}
-          <div className="flex items-center h-16 px-6 border-b border-white/10">
+          <div className="flex items-center h-16 px-6 border-b border-glass-border">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-white">Timetable</h1>
-                <p className="text-xs text-gray-400 capitalize">{userRole} Portal</p>
+                <h1 className="text-lg font-bold text-primary">Timetable</h1>
+                <p className="text-xs text-muted capitalize">{userRole} Portal</p>
               </div>
             </div>
           </div>
@@ -181,7 +181,7 @@ export function DashboardNav({ userRole, userName }: DashboardNavProps) {
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                   item.active
                     ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                    : 'text-secondary hover:text-primary hover:bg-glass-hover'
                 }`}
               >
                 <item.icon className="w-5 h-5" />
@@ -191,16 +191,16 @@ export function DashboardNav({ userRole, userName }: DashboardNavProps) {
           </nav>
 
           {/* User Profile & Actions */}
-          <div className="p-4 border-t border-white/10">
+          <div className="p-4 border-t border-glass-border">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                 <RoleIcon className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
+                <p className="text-sm font-medium text-primary truncate">
                   {userName || 'User'}
                 </p>
-                <p className="text-xs text-gray-400 capitalize">{userRole}</p>
+                <p className="text-xs text-muted capitalize">{userRole}</p>
               </div>
             </div>
 
@@ -210,7 +210,7 @@ export function DashboardNav({ userRole, userName }: DashboardNavProps) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleLogout}
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-secondary hover:text-primary hover:bg-glass-hover rounded-lg transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Logout</span>
@@ -222,19 +222,19 @@ export function DashboardNav({ userRole, userName }: DashboardNavProps) {
 
       {/* Mobile Header */}
       <div className="lg:hidden">
-        <div className="flex items-center justify-between h-16 px-4 bg-black/20 backdrop-blur-lg border-b border-white/10">
+        <div className="flex items-center justify-between h-16 px-4 glass-card border-b border-glass-border">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <Calendar className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-lg font-bold text-white">Timetable</h1>
+            <h1 className="text-lg font-bold text-primary">Timetable</h1>
           </div>
 
           <div className="flex items-center space-x-2">
             <ThemeToggle />
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+              className="p-2 text-secondary hover:text-primary hover:bg-glass-hover rounded-lg transition-all"
             >
               {isMobileMenuOpen ? (
                 <X className="w-6 h-6" />
@@ -251,7 +251,7 @@ export function DashboardNav({ userRole, userName }: DashboardNavProps) {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="lg:hidden bg-black/20 backdrop-blur-lg border-b border-white/10"
+            className="lg:hidden glass-card border-b border-glass-border"
           >
             <nav className="px-4 py-4 space-y-2">
               {navItems.map((item) => (
@@ -264,7 +264,7 @@ export function DashboardNav({ userRole, userName }: DashboardNavProps) {
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
                     item.active
                       ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'text-gray-300 hover:text-white hover:bg-white/5'
+                      : 'text-secondary hover:text-primary hover:bg-glass-hover'
                   }`}
                 >
                   <item.icon className="w-5 h-5" />
@@ -273,23 +273,23 @@ export function DashboardNav({ userRole, userName }: DashboardNavProps) {
               ))}
             </nav>
 
-            <div className="px-4 py-4 border-t border-white/10">
+            <div className="px-4 py-4 border-t border-glass-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
                     <RoleIcon className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-white">
+                    <p className="text-sm font-medium text-primary">
                       {userName || 'User'}
                     </p>
-                    <p className="text-xs text-gray-400 capitalize">{userRole}</p>
+                    <p className="text-xs text-muted capitalize">{userRole}</p>
                   </div>
                 </div>
 
                 <button
                   onClick={handleLogout}
-                  className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  className="flex items-center space-x-2 px-3 py-2 text-sm text-secondary hover:text-primary hover:bg-glass-hover rounded-lg transition-all"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>

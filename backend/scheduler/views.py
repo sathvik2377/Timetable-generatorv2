@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from users.permissions import IsAdminUser
-from timetable.models import Institution, Timetable, TimetableConstraint
+from timetable.models import Institution, Timetable, TimetableConstraint, Subject, Teacher, Room, ClassGroup, TimetableSession
 from .ortools_scheduler import TimetableScheduler
 from .serializers import GenerateTimetableSerializer, TimetableConstraintSerializer
 import logging
@@ -496,3 +496,188 @@ class GenerateDemoTimetableView(generics.GenericAPIView):
                 'generated_at': timezone.now().isoformat()
             }
         }, status=status.HTTP_200_OK)
+
+
+class GenerateMultipleVariantsView(generics.CreateAPIView):
+    """
+    Generate multiple timetable variants using OR-Tools scheduler
+    """
+    serializer_class = GenerateTimetableSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        institution_id = serializer.validated_data['institution_id']
+        timetable_name = serializer.validated_data['name']
+        num_variants = request.data.get('num_variants', 3)
+
+        try:
+            # Check if institution exists
+            try:
+                institution = Institution.objects.get(id=institution_id)
+            except Institution.DoesNotExist:
+                # Create a demo institution if none exists
+                institution = Institution.objects.create(
+                    name="Demo Institution",
+                    type="college",
+                    address="Demo Address",
+                    phone="123-456-7890",
+                    email="demo@institution.edu"
+                )
+                institution_id = institution.id
+
+            # Initialize scheduler
+            scheduler = TimetableScheduler(institution_id)
+
+            # Generate multiple variants
+            variants = scheduler.generate_multiple_variants(
+                name=timetable_name,
+                generated_by_user=request.user,
+                num_variants=min(num_variants, 5)  # Limit to 5 variants max
+            )
+
+            # Filter successful variants
+            successful_variants = [v for v in variants if v['status'] in ['optimal', 'feasible']]
+
+            if successful_variants:
+                return Response({
+                    'success': True,
+                    'message': f'Generated {len(successful_variants)} timetable variants',
+                    'variants': successful_variants,
+                    'total_requested': num_variants,
+                    'successful_count': len(successful_variants),
+                    'failed_count': len(variants) - len(successful_variants)
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response({
+                    'success': False,
+                    'message': 'Failed to generate any feasible timetable variants',
+                    'variants': variants,
+                    'error': 'NO_FEASIBLE_SOLUTIONS'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.error(f"Error generating timetable variants: {str(e)}")
+            return Response({
+                'success': False,
+                'message': 'An error occurred while generating timetable variants',
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CommitTimetableVariantView(generics.CreateAPIView):
+    """
+    Commit a selected timetable variant to the database
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def create(self, request, *args, **kwargs):
+        variant_data = request.data.get('variant')
+        timetable_name = request.data.get('name', 'Generated Timetable')
+        institution_id = request.data.get('institution_id')
+
+        if not variant_data or not variant_data.get('solution'):
+            return Response({
+                'success': False,
+                'message': 'Variant data is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Get or create institution
+            try:
+                institution = Institution.objects.get(id=institution_id)
+            except Institution.DoesNotExist:
+                institution = Institution.objects.create(
+                    name="Demo Institution",
+                    type="college",
+                    address="Demo Address",
+                    phone="123-456-7890",
+                    email="demo@institution.edu"
+                )
+
+            # Create timetable with unique version
+            from django.db import IntegrityError
+            from datetime import datetime
+
+            # Get the next available version number
+            current_year = datetime.now().year
+            existing_versions = Timetable.objects.filter(
+                institution=institution,
+                academic_year=f"{current_year}-{current_year+1}",
+                semester=1
+            ).values_list('version', flat=True)
+
+            next_version = max(existing_versions, default=0) + 1
+
+            try:
+                timetable = Timetable.objects.create(
+                    name=timetable_name,
+                    institution=institution,
+                    generated_by=request.user,
+                    status='active',
+                    academic_year=f"{current_year}-{current_year+1}",
+                    semester=1,
+                    version=next_version,
+                    total_sessions=variant_data['metrics']['total_sessions'],
+                    optimization_score=variant_data['metrics']['quality_score']
+                )
+            except IntegrityError:
+                # If still fails, use timestamp as version
+                import time
+                timestamp_version = int(time.time()) % 10000
+                timetable = Timetable.objects.create(
+                    name=timetable_name,
+                    institution=institution,
+                    generated_by=request.user,
+                    status='active',
+                    academic_year=f"{current_year}-{timestamp_version}",
+                    semester=1,
+                    version=1,
+                    total_sessions=variant_data['metrics']['total_sessions'],
+                    optimization_score=variant_data['metrics']['quality_score']
+                )
+
+            # Create sessions from variant solution
+            sessions_created = 0
+            for session_data in variant_data['solution']:
+                try:
+                    # Get related objects
+                    subject = Subject.objects.get(id=session_data['subject_id'])
+                    teacher = Teacher.objects.get(id=session_data['teacher_id'])
+                    room = Room.objects.get(id=session_data['room_id'])
+                    class_group = ClassGroup.objects.get(id=session_data['class_group_id'])
+
+                    # Create session
+                    TimetableSession.objects.create(
+                        timetable=timetable,
+                        subject=subject,
+                        teacher=teacher,
+                        room=room,
+                        class_group=class_group,
+                        day_of_week=session_data['day_of_week'],
+                        start_time=session_data['start_time'],
+                        end_time=session_data['end_time']
+                    )
+                    sessions_created += 1
+
+                except Exception as session_error:
+                    logger.warning(f"Failed to create session: {session_error}")
+                    continue
+
+            return Response({
+                'success': True,
+                'message': 'Timetable variant committed successfully',
+                'timetable_id': timetable.id,
+                'sessions_created': sessions_created,
+                'metrics': variant_data['metrics']
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f"Error committing timetable variant: {str(e)}")
+            return Response({
+                'success': False,
+                'message': 'Failed to commit timetable variant',
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

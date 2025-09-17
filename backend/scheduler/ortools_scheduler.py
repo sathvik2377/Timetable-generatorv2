@@ -87,7 +87,12 @@ class TimetableScheduler:
         Generate all possible time slots based on institution settings
         """
         time_slots = []
-        working_days = self.institution.working_days or [0, 1, 2, 3, 4]  # Mon-Fri default
+        # Convert day names to numbers if needed
+        if self.institution.working_days and isinstance(self.institution.working_days[0], str):
+            day_mapping = {'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6}
+            working_days = [day_mapping.get(day, -1) for day in self.institution.working_days if day in day_mapping]
+        else:
+            working_days = self.institution.working_days or [0, 1, 2, 3, 4]  # Mon-Fri default
         
         # Convert times to datetime for easier manipulation
         start_time = datetime.combine(datetime.today(), self.institution.start_time)
@@ -1361,3 +1366,214 @@ class TimetableScheduler:
                 session_map[class_key] = session
 
         return conflicts
+
+    def generate_multiple_variants(self, name: str, generated_by_user, num_variants: int = 3) -> List[Dict]:
+        """
+        Generate multiple timetable variants with different optimization seeds
+        """
+        logger.info(f"Generating {num_variants} timetable variants")
+        variants = []
+
+        # Prepare data once
+        self.prepare_data()
+
+        for variant_idx in range(num_variants):
+            logger.info(f"Generating variant {variant_idx + 1}/{num_variants}")
+
+            # Create new model and solver for each variant
+            self.model = cp_model.CpModel()
+            self.solver = cp_model.CpSolver()
+            self.variables = {}
+
+            # Configure solver with different random seed
+            self.solver.parameters.max_time_in_seconds = 120  # 2 minutes per variant
+            self.solver.parameters.num_search_workers = 4
+            self.solver.parameters.random_seed = variant_idx * 42 + 123
+            self.solver.parameters.search_branching = cp_model.PORTFOLIO_SEARCH
+
+            # Create variables and constraints
+            self.create_variables()
+            self.add_constraints()
+
+            # Solve
+            status = self.solver.Solve(self.model)
+
+            if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+                # Extract solution
+                solution_data = self._extract_solution()
+
+                # Calculate metrics
+                metrics = self._calculate_variant_metrics(solution_data.get('sessions', []))
+
+                variants.append({
+                    'variant_id': variant_idx + 1,
+                    'status': 'feasible' if status == cp_model.FEASIBLE else 'optimal',
+                    'solution': solution_data,
+                    'metrics': metrics,
+                    'solver_stats': {
+                        'solve_time': self.solver.WallTime(),
+                        'objective_value': self.solver.ObjectiveValue() if self.solver.ObjectiveValue() else 0,
+                        'num_conflicts': self.solver.NumConflicts(),
+                        'num_branches': self.solver.NumBranches()
+                    }
+                })
+
+                logger.info(f"Variant {variant_idx + 1} generated successfully")
+            else:
+                logger.warning(f"Variant {variant_idx + 1} failed: {self.solver.StatusName(status)}")
+                variants.append({
+                    'variant_id': variant_idx + 1,
+                    'status': 'failed',
+                    'error': self.solver.StatusName(status),
+                    'solution': None,
+                    'metrics': None
+                })
+
+        return variants
+
+    def _calculate_variant_metrics(self, solution_data: List[Dict]) -> Dict:
+        """
+        Calculate comprehensive metrics for a timetable variant
+        """
+        if not solution_data:
+            return {}
+
+        # Group sessions by day and time
+        schedule_map = {}
+        teacher_hours = {}
+        room_utilization = {}
+        daily_distribution = {day: 0 for day in range(7)}
+
+        for session in solution_data:
+            day = session['day_of_week']
+            time_key = f"{day}_{session['start_time']}"
+
+            if time_key not in schedule_map:
+                schedule_map[time_key] = []
+            schedule_map[time_key].append(session)
+
+            # Track teacher hours
+            teacher_id = session['teacher_id']
+            if teacher_id not in teacher_hours:
+                teacher_hours[teacher_id] = 0
+            teacher_hours[teacher_id] += 1
+
+            # Track room utilization
+            room_id = session['room_id']
+            if room_id not in room_utilization:
+                room_utilization[room_id] = 0
+            room_utilization[room_id] += 1
+
+            # Track daily distribution
+            daily_distribution[day] += 1
+
+        # Calculate metrics
+        total_sessions = len(solution_data)
+        total_time_slots = len(self.data.time_slots)
+        total_rooms = len(self.data.rooms)
+
+        # Utilization metrics
+        avg_room_utilization = sum(room_utilization.values()) / (total_rooms * total_time_slots) * 100
+
+        # Teacher load balance
+        teacher_loads = list(teacher_hours.values())
+        avg_teacher_load = sum(teacher_loads) / len(teacher_loads) if teacher_loads else 0
+        teacher_load_variance = sum((load - avg_teacher_load) ** 2 for load in teacher_loads) / len(teacher_loads) if teacher_loads else 0
+
+        # Daily distribution balance
+        daily_loads = list(daily_distribution.values())
+        avg_daily_load = sum(daily_loads) / len([d for d in daily_loads if d > 0])
+        daily_variance = sum((load - avg_daily_load) ** 2 for load in daily_loads if load > 0) / len([d for d in daily_loads if d > 0])
+
+        # Conflict detection
+        conflicts = self._detect_conflicts(solution_data)
+
+        return {
+            'total_sessions': total_sessions,
+            'room_utilization_percent': round(avg_room_utilization, 2),
+            'teacher_load_balance': round(100 - (teacher_load_variance / avg_teacher_load * 100) if avg_teacher_load > 0 else 0, 2),
+            'daily_distribution_balance': round(100 - (daily_variance / avg_daily_load * 100) if avg_daily_load > 0 else 0, 2),
+            'total_conflicts': len(conflicts),
+            'conflict_details': conflicts,
+            'teacher_hours': teacher_hours,
+            'room_utilization': room_utilization,
+            'daily_distribution': daily_distribution,
+            'quality_score': self._calculate_quality_score(
+                avg_room_utilization,
+                teacher_load_variance,
+                daily_variance,
+                len(conflicts)
+            )
+        }
+
+    def _detect_conflicts(self, solution_data: List[Dict]) -> List[Dict]:
+        """
+        Detect scheduling conflicts in the solution
+        """
+        conflicts = []
+        schedule_map = {}
+
+        for session in solution_data:
+            time_key = (session['day_of_week'], session['start_time'])
+
+            # Check teacher conflicts
+            teacher_key = (time_key, 'teacher', session['teacher_id'])
+            if teacher_key in schedule_map:
+                conflicts.append({
+                    'type': 'teacher_conflict',
+                    'teacher_id': session['teacher_id'],
+                    'time': time_key,
+                    'sessions': [schedule_map[teacher_key], session]
+                })
+            else:
+                schedule_map[teacher_key] = session
+
+            # Check room conflicts
+            room_key = (time_key, 'room', session['room_id'])
+            if room_key in schedule_map:
+                conflicts.append({
+                    'type': 'room_conflict',
+                    'room_id': session['room_id'],
+                    'time': time_key,
+                    'sessions': [schedule_map[room_key], session]
+                })
+            else:
+                schedule_map[room_key] = session
+
+            # Check class conflicts
+            class_key = (time_key, 'class', session['class_group_id'])
+            if class_key in schedule_map:
+                conflicts.append({
+                    'type': 'class_conflict',
+                    'class_group_id': session['class_group_id'],
+                    'time': time_key,
+                    'sessions': [schedule_map[class_key], session]
+                })
+            else:
+                schedule_map[class_key] = session
+
+        return conflicts
+
+    def _calculate_quality_score(self, room_util: float, teacher_var: float, daily_var: float, conflicts: int) -> float:
+        """
+        Calculate overall quality score for the timetable variant
+        """
+        # Base score starts at 100
+        score = 100.0
+
+        # Penalize conflicts heavily
+        score -= conflicts * 10
+
+        # Reward good room utilization (target: 70-85%)
+        if 70 <= room_util <= 85:
+            score += 10
+        else:
+            score -= abs(room_util - 77.5) * 0.2
+
+        # Penalize high variance in teacher loads
+        score -= teacher_var * 0.1
+
+        # Penalize high variance in daily distribution
+        score -= daily_var * 0.1
+
+        return max(0, round(score, 2))

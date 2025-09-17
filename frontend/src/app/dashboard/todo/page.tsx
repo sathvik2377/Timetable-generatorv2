@@ -196,7 +196,7 @@ export default function TodoPage() {
   const pendingCount = todos.filter(todo => !todo.completed).length
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -218,7 +218,7 @@ export default function TodoPage() {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 hover:shadow-lg transition-all"
+            className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2 hover:shadow-lg transition-all"
           >
             <Plus className="w-5 h-5" />
             <span>Add Todo</span>
@@ -282,7 +282,7 @@ export default function TodoPage() {
               {todos.length === 0 && (
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg"
+                  className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-6 py-3 rounded-lg"
                 >
                   Add Your First Todo
                 </button>
@@ -458,7 +458,7 @@ export default function TodoPage() {
               </button>
               <button
                 onClick={editingTodo ? updateTodo : addTodo}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-600 text-white rounded-lg hover:shadow-lg transition-all"
               >
                 {editingTodo ? 'Update' : 'Add'} Todo
               </button>
