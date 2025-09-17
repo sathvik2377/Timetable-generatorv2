@@ -26,9 +26,9 @@ export default function LoginPage() {
   // Set default credentials based on role
   useEffect(() => {
     const defaultCredentials = {
-      admin: { email: 'admin@demo.local', password: 'demo123' },
-      faculty: { email: 'anita@college.edu.in', password: 'demo123' },
-      student: { email: 'student@demo.local', password: 'demo123' }
+      admin: { email: 'admin@demo.local', password: 'Admin@1234' },
+      faculty: { email: 'faculty@demo.local', password: 'Faculty@123' },
+      student: { email: 'student@demo.local', password: 'Student@123' }
     }
 
     const defaults = defaultCredentials[role as keyof typeof defaultCredentials] || defaultCredentials.admin
@@ -42,8 +42,8 @@ export default function LoginPage() {
     setError('')
 
     try {
-      // Use JWT token endpoint
-      const response = await axios.post('http://localhost:8000/api/auth/token/', {
+      // Use dev login endpoint
+      const response = await axios.post('http://127.0.0.1:8000/api/users/dev-login/', {
         email: formData.email,
         password: formData.password
       })
@@ -172,6 +172,46 @@ export default function LoginPage() {
                     Pre-filled credentials for quick testing. You can modify them if needed.
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* One-Click Login Buttons */}
+            <div className="mb-6">
+              <p className="text-sm text-gray-400 text-center mb-3">Quick Login</p>
+              <div className="grid grid-cols-3 gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setFormData({ email: 'admin@demo.local', password: 'Admin@1234' })
+                    setTimeout(() => handleSubmit({ preventDefault: () => {} } as any), 100)
+                  }}
+                  className="py-2 px-3 text-xs bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all"
+                >
+                  Admin
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setFormData({ email: 'faculty@demo.local', password: 'Faculty@123' })
+                    setTimeout(() => handleSubmit({ preventDefault: () => {} } as any), 100)
+                  }}
+                  className="py-2 px-3 text-xs bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-all"
+                >
+                  Faculty
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setFormData({ email: 'student@demo.local', password: 'Student@123' })
+                    setTimeout(() => handleSubmit({ preventDefault: () => {} } as any), 100)
+                  }}
+                  className="py-2 px-3 text-xs bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-all"
+                >
+                  Student
+                </motion.button>
               </div>
             </div>
 

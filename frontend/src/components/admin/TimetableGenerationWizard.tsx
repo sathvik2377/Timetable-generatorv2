@@ -42,7 +42,7 @@ export default function TimetableGenerationWizard({ onComplete, onCancel }: Time
     // NEP-2020 College Details
     college: {
       name: '',
-      academicYear: '2024-25',
+      academicYear: '2025-26',
       type: 'college', // school vs college
       startTime: '09:00',
       endTime: '17:00',
@@ -477,9 +477,9 @@ function CollegeDetailsStep({ data, onChange }: CollegeDetailsStepProps) {
             </label>
             <input
               type="text"
-              value={data.academicYear || '2024-25'}
+              value={data.academicYear || '2025-26'}
               onChange={(e) => onChange({ ...data, academicYear: e.target.value })}
-              placeholder="2024-25"
+              placeholder="2025-26"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             />
           </div>

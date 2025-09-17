@@ -25,7 +25,7 @@ export default function UsersPage() {
       phone: '+1-234-567-8900',
       department: 'Administration',
       status: 'active',
-      lastLogin: '2024-01-15 10:30 AM'
+      lastLogin: '2025-01-15 10:30 AM'
     },
     {
       id: 2,
@@ -35,7 +35,7 @@ export default function UsersPage() {
       phone: '+1-234-567-8901',
       department: 'Computer Science',
       status: 'active',
-      lastLogin: '2024-01-15 09:15 AM'
+      lastLogin: '2025-01-15 09:15 AM'
     },
     {
       id: 3,
@@ -45,7 +45,7 @@ export default function UsersPage() {
       phone: '+1-234-567-8902',
       department: 'Mathematics',
       status: 'active',
-      lastLogin: '2024-01-14 02:45 PM'
+      lastLogin: '2025-01-14 02:45 PM'
     },
     {
       id: 4,
@@ -55,7 +55,7 @@ export default function UsersPage() {
       phone: '+1-234-567-8903',
       department: 'Computer Science',
       status: 'active',
-      lastLogin: '2024-01-15 08:20 AM'
+      lastLogin: '2025-01-15 08:20 AM'
     },
     {
       id: 5,
@@ -65,7 +65,7 @@ export default function UsersPage() {
       phone: '+1-234-567-8904',
       department: 'Mathematics',
       status: 'active',
-      lastLogin: '2024-01-14 11:30 AM'
+      lastLogin: '2025-01-14 11:30 AM'
     },
     {
       id: 6,
@@ -75,7 +75,7 @@ export default function UsersPage() {
       phone: '+1-234-567-8905',
       department: 'Physics',
       status: 'inactive',
-      lastLogin: '2024-01-10 03:15 PM'
+      lastLogin: '2025-01-10 03:15 PM'
     }
   ]);
 

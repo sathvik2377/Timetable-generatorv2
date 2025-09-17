@@ -71,7 +71,7 @@ export default function AdminUsersPage() {
             phone: '+1-234-567-8900',
             department: 'Administration',
             status: 'active',
-            lastLogin: '2024-01-15 10:30 AM'
+            lastLogin: '2025-01-15 10:30 AM'
           },
           {
             id: 2,
@@ -81,7 +81,7 @@ export default function AdminUsersPage() {
             phone: '+1-234-567-8901',
             department: 'Computer Science',
             status: 'active',
-            lastLogin: '2024-01-15 09:15 AM'
+            lastLogin: '2025-01-15 09:15 AM'
           },
           {
             id: 3,
@@ -91,7 +91,7 @@ export default function AdminUsersPage() {
             phone: '+1-234-567-8902',
             department: 'Computer Science',
             status: 'active',
-            lastLogin: '2024-01-14 02:45 PM'
+            lastLogin: '2025-01-14 02:45 PM'
           }
         ]);
       } finally {

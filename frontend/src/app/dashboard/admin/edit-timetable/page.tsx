@@ -473,7 +473,7 @@ export default function AdminEditTimetablePage() {
       }));
 
       setHasChanges(true);
-      analyzeConflicts();
+      // analyzeConflicts(); // TODO: Implement conflict analysis
 
     } catch (error) {
       console.error('Failed to generate timetable:', error);
@@ -562,7 +562,7 @@ export default function AdminEditTimetablePage() {
 
     setHasChanges(true);
     setShowTemplateModal(false);
-    analyzeConflicts();
+    // analyzeConflicts(); // TODO: Implement conflict analysis
   };
 
   const getSlotColor = (type: string) => {

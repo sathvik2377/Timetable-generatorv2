@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import axios from 'axios'
 import {
   ArrowLeft,
   Brain,
@@ -245,6 +246,20 @@ export default function SmartSetupPage() {
     }
   }
 
+  const commitTimetableVariant = async (variant: any, name: string) => {
+    const token = localStorage.getItem('token')
+    return await axios.post('http://localhost:8000/api/scheduler/commit-variant/', {
+      variant: variant,
+      name: name,
+      institution_id: 1
+    }, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+  }
+
   const handleSelectVariant = async (variant: any) => {
     try {
       const response = await axios.post('http://localhost:8000/api/scheduler/commit-variant/', {
@@ -298,6 +313,64 @@ export default function SmartSetupPage() {
       }
     } catch (error: any) {
       toast.error('Failed to commit variant: ' + (error.response?.data?.message || error.message))
+    }
+  }
+
+  const handleCreateDirectTimetable = async () => {
+    setIsGenerating(true)
+    try {
+      // First load sample data
+      handleUseSampleData()
+
+      // Wait a moment for state to update
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      toast.loading('AI is creating optimized timetable with sample data...')
+
+      // Generate timetable with sample data
+      const response = await generateTimetableVariants('smart', {
+        institution_id: 1,
+        name: `Smart Setup AI Sample - ${new Date().toLocaleDateString()}`,
+        parameters: {
+          institution_name: 'AI-Optimized Demo Institution',
+          institution_type: 'university',
+          branches: 4,
+          subjects: 12,
+          teachers: 10,
+          rooms: 8,
+          start_time: '08:00',
+          end_time: '17:00',
+          lunch_start: '12:00',
+          lunch_end: '13:00',
+          working_days: [1, 2, 3, 4, 5],
+          generate_per_branch: true, // Enable branch-specific generation
+          ai_optimization: true,
+          smart_scheduling: true
+        }
+      })
+
+      if (response.data.success && response.data.variants.length > 0) {
+        // Automatically commit the best variant (highest quality score)
+        const bestVariant = response.data.variants.reduce((best: any, current: any) =>
+          current.metrics.quality_score > best.metrics.quality_score ? current : best
+        )
+
+        const commitResponse = await commitTimetableVariant(bestVariant, `Smart AI Sample Timetable - ${new Date().toLocaleDateString()}`)
+
+        if (commitResponse.data.success) {
+          toast.success('AI-optimized sample timetable created successfully!')
+          router.push('/dashboard/admin')
+        } else {
+          toast.error('Failed to create AI sample timetable')
+        }
+      } else {
+        toast.error('Failed to generate AI sample timetable')
+      }
+    } catch (error) {
+      console.error('Error creating direct AI timetable:', error)
+      toast.error('Error creating AI sample timetable')
+    } finally {
+      setIsGenerating(false)
     }
   }
 
@@ -1247,25 +1320,47 @@ export default function SmartSetupPage() {
                 <ChevronRight className="w-4 h-4" />
               </motion.button>
             ) : (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleGenerate}
-                disabled={isGenerating || !formData.institutionName}
-                className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-8 py-4 rounded-lg flex items-center space-x-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="spinner" />
-                    <span>AI is Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Brain className="w-5 h-5" />
-                    <span>Generate Timetable</span>
-                  </>
-                )}
-              </motion.button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleGenerate}
+                  disabled={isGenerating || !formData.institutionName}
+                  className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-8 py-4 rounded-lg flex items-center space-x-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="spinner" />
+                      <span>AI is Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="w-5 h-5" />
+                      <span>Generate Timetable</span>
+                    </>
+                  )}
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleCreateDirectTimetable}
+                  disabled={isGenerating}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-lg flex items-center space-x-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="spinner" />
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-5 h-5" />
+                      <span>Create AI Sample</span>
+                    </>
+                  )}
+                </motion.button>
+              </div>
             )}
           </div>
         </motion.div>

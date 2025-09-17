@@ -344,7 +344,7 @@ export default function AboutPage() {
                 <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-4 mb-4">
                   <h4 className="font-bold text-blue-600 dark:text-blue-400 mb-2">Variables</h4>
                   <p className="text-sm text-secondary">
-                    x[s,t,r] ∈ {0,1}<br/>
+                    x[s,t,r] ∈ {`{0,1}`}<br/>
                     Binary: Subject s at time t in room r
                   </p>
                 </div>
@@ -373,6 +373,159 @@ export default function AboutPage() {
                 <strong>Algorithm Complexity:</strong> O(n^k) where n = variables, k = constraint density.
                 Our optimizations reduce this to practical O(n log n) for typical academic schedules.
               </p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Algorithm & Logic Section */}
+      <section className="py-16 px-6 bg-gradient-to-r from-blue-500/5 to-purple-500/5">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-4xl font-bold text-primary mb-4">Timetable Generation Algorithm</h2>
+            <p className="text-secondary max-w-3xl mx-auto">
+              Our AI-powered system uses advanced constraint programming and optimization techniques
+              to generate optimal timetables that satisfy all NEP 2020 requirements.
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-8 mb-12">
+            {/* Algorithm Flow */}
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="glass-card p-6"
+            >
+              <h3 className="text-xl font-semibold text-primary mb-4 flex items-center">
+                <Code className="w-5 h-5 mr-2" />
+                Algorithm Flow
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</div>
+                  <div>
+                    <h4 className="font-medium text-primary">Data Preparation</h4>
+                    <p className="text-sm text-secondary">Collect subjects, teachers, rooms, and class groups with their constraints</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</div>
+                  <div>
+                    <h4 className="font-medium text-primary">Variable Creation</h4>
+                    <p className="text-sm text-secondary">Generate boolean variables for each possible session assignment</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</div>
+                  <div>
+                    <h4 className="font-medium text-primary">Constraint Application</h4>
+                    <p className="text-sm text-secondary">Apply NEP 2020 constraints: teacher availability, room capacity, subject hours</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold">4</div>
+                  <div>
+                    <h4 className="font-medium text-primary">Optimization</h4>
+                    <p className="text-sm text-secondary">Use OR-Tools CP-SAT solver to find optimal solution</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3">
+                  <div className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">5</div>
+                  <div>
+                    <h4 className="font-medium text-primary">Solution Extraction</h4>
+                    <p className="text-sm text-secondary">Convert solver output to readable timetable format</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Key Constraints */}
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="glass-card p-6"
+            >
+              <h3 className="text-xl font-semibold text-primary mb-4 flex items-center">
+                <Shield className="w-5 h-5 mr-2" />
+                Key Constraints
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-secondary">No teacher conflicts (one teacher, one time slot)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-secondary">No room conflicts (one class per room per slot)</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-secondary">Subject weekly hours compliance</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-secondary">Teacher maximum hours per week</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-secondary">Room capacity vs class strength</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-secondary">Working days and lunch break exclusions</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-secondary">Lab subjects in lab rooms only</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-sm text-secondary">Branch-specific subject assignments</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Optimization Objectives */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            className="glass-card p-6"
+          >
+            <h3 className="text-xl font-semibold text-primary mb-4 flex items-center">
+              <Target className="w-5 h-5 mr-2" />
+              Optimization Objectives
+            </h3>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <BarChart3 className="w-6 h-6 text-blue-500" />
+                </div>
+                <h4 className="font-medium text-primary mb-2">Room Utilization</h4>
+                <p className="text-sm text-secondary">Maximize efficient use of available rooms and facilities</p>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Users className="w-6 h-6 text-green-500" />
+                </div>
+                <h4 className="font-medium text-primary mb-2">Teacher Load Balance</h4>
+                <p className="text-sm text-secondary">Distribute teaching load evenly across the week</p>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Calendar className="w-6 h-6 text-purple-500" />
+                </div>
+                <h4 className="font-medium text-primary mb-2">Schedule Quality</h4>
+                <p className="text-sm text-secondary">Minimize gaps and optimize learning patterns</p>
+              </div>
             </div>
           </motion.div>
         </div>

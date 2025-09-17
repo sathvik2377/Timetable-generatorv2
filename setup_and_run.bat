@@ -34,8 +34,24 @@ python manage.py makemigrations
 echo Applying migrations...
 python manage.py migrate
 
-echo Creating superuser...
-echo from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(email='admin@demo.local').delete(); User.objects.create_superuser(email='admin@demo.local', password='Admin@1234', first_name='Admin', last_name='User') | python manage.py shell
+echo Creating superuser and sample data...
+python -c "
+import os, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+django.setup()
+from django.contrib.auth import get_user_model
+User = get_user_model()
+User.objects.filter(email='admin@demo.local').delete()
+admin = User.objects.create_superuser(
+    email='admin@demo.local',
+    password='Admin@1234',
+    username='admin',
+    first_name='Admin',
+    last_name='User',
+    role='admin'
+)
+print('Admin user created successfully')
+"
 
 echo.
 echo ========================================

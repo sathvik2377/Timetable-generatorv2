@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import axios from 'axios'
 import { 
   ArrowLeft, 
   Database, 
@@ -158,6 +159,20 @@ export default function BatchSetupPage() {
     }
   }
 
+  const commitTimetableVariant = async (variant: any, name: string) => {
+    const token = localStorage.getItem('token')
+    return await axios.post('http://localhost:8000/api/scheduler/commit-variant/', {
+      variant: variant,
+      name: name,
+      institution_id: 1
+    }, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+  }
+
   const handleSelectVariant = async (variant: any) => {
     try {
       const response = await axios.post('http://localhost:8000/api/scheduler/commit-variant/', {
@@ -214,6 +229,62 @@ export default function BatchSetupPage() {
     }
   }
 
+  const handleCreateDirectTimetable = async () => {
+    setIsGenerating(true)
+    try {
+      // First load sample data
+      handleUseSampleData()
+
+      // Wait a moment for state to update
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      toast.loading('Creating enterprise batch timetable with sample data...')
+
+      // Generate timetable with sample data
+      const response = await generateTimetableVariants('batch', {
+        institution_id: 1,
+        name: `Batch Setup Enterprise Sample - ${new Date().toLocaleDateString()}`,
+        parameters: {
+          institution_name: 'Enterprise Demo University',
+          institution_type: 'university',
+          campuses: 3,
+          branches: 8,
+          subjects: 15,
+          teachers: 20,
+          rooms: 15,
+          start_time: '07:30',
+          end_time: '17:00',
+          lunch_start: '12:30',
+          lunch_end: '13:30',
+          working_days: [1, 2, 3, 4, 5],
+          generate_per_branch: true, // Enable branch-specific generation
+          batch_processing: true,
+          enterprise_mode: true
+        }
+      })
+
+      if (response.data.success && response.data.variants.length > 0) {
+        // Automatically commit the first variant
+        const firstVariant = response.data.variants[0]
+        const commitResponse = await commitTimetableVariant(firstVariant, `Batch Enterprise Sample - ${new Date().toLocaleDateString()}`)
+
+        if (commitResponse.data.success) {
+          toast.success('Enterprise batch sample timetable created successfully!')
+          router.push('/dashboard/admin')
+        } else {
+          toast.error('Failed to create batch sample timetable')
+        }
+      } else {
+        toast.error('Failed to generate batch sample timetable')
+      }
+    } catch (error) {
+      console.error('Error creating direct batch timetable:', error)
+      toast.error('Error creating batch sample timetable')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const generateBatchSchedule = () => {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
     const subjects = [
@@ -227,7 +298,7 @@ export default function BatchSetupPage() {
       '11:30-12:30', '13:00-14:00', '14:00-15:00', '15:00-16:00', '16:00-17:00'
     ]
     
-    const schedule = []
+    const schedule: any[] = []
     
     timeSlots.forEach((time, timeIndex) => {
       const row: any = { Time: time }
@@ -554,8 +625,8 @@ export default function BatchSetupPage() {
             </div>
           </div>
 
-          {/* Generate Button */}
-          <div className="mt-8 flex justify-center">
+          {/* Generate Buttons */}
+          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -572,6 +643,26 @@ export default function BatchSetupPage() {
                 <>
                   <Database className="w-5 h-5" />
                   <span>Generate Batch Timetable</span>
+                </>
+              )}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleCreateDirectTimetable}
+              disabled={isGenerating}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-lg flex items-center space-x-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold"
+            >
+              {isGenerating ? (
+                <>
+                  <div className="spinner" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <>
+                  <Database className="w-5 h-5" />
+                  <span>Create Enterprise Sample</span>
                 </>
               )}
             </motion.button>

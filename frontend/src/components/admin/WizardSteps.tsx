@@ -579,7 +579,7 @@ export function ReviewStep({ data, onGenerate }: ReviewStepProps) {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-300">Academic Year:</span>
-              <span className="font-medium text-gray-900 dark:text-white">{data.college?.academicYear || '2024-25'}</span>
+              <span className="font-medium text-gray-900 dark:text-white">{data.college?.academicYear || '2025-26'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-300">Type:</span>

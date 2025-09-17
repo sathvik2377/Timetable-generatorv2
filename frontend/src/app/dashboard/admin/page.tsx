@@ -165,8 +165,8 @@ function AdminDashboard() {
 
       // Load timetables
       const timetablesData = [
-        { id: 1, name: 'Fall 2024 Schedule', status: 'active', institution_id: 1 },
-        { id: 2, name: 'Spring 2024 Schedule', status: 'draft', institution_id: 1 }
+        { id: 1, name: 'Fall 2025 Schedule', status: 'active', institution_id: 1 },
+        { id: 2, name: 'Spring 2025 Schedule', status: 'draft', institution_id: 1 }
       ]
       setTimetables(timetablesData)
     } catch (error) {

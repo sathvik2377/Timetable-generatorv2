@@ -531,12 +531,26 @@ class GenerateMultipleVariantsView(generics.CreateAPIView):
             # Initialize scheduler
             scheduler = TimetableScheduler(institution_id)
 
-            # Generate multiple variants
-            variants = scheduler.generate_multiple_variants(
-                name=timetable_name,
-                generated_by_user=request.user,
-                num_variants=min(num_variants, 5)  # Limit to 5 variants max
-            )
+            # Get parameters from request data
+            parameters = request.data.get('parameters', {})
+
+            # Check if branch-specific generation is requested
+            generate_per_branch = parameters.get('generate_per_branch', False)
+
+            if generate_per_branch:
+                # Generate separate timetables for each branch
+                variants = scheduler.generate_branch_specific_timetables(
+                    name=timetable_name,
+                    generated_by_user=request.user,
+                    num_variants=min(num_variants, 3)  # Limit variants per branch
+                )
+            else:
+                # Generate multiple variants for the entire institution
+                variants = scheduler.generate_multiple_variants_working(
+                    name=timetable_name,
+                    generated_by_user=request.user,
+                    num_variants=min(num_variants, 5)  # Limit to 5 variants max
+                )
 
             # Filter successful variants
             successful_variants = [v for v in variants if v['status'] in ['optimal', 'feasible']]
@@ -578,7 +592,18 @@ class CommitTimetableVariantView(generics.CreateAPIView):
         timetable_name = request.data.get('name', 'Generated Timetable')
         institution_id = request.data.get('institution_id')
 
-        if not variant_data or not variant_data.get('solution'):
+        # Debug logging
+        logger.info(f"Received variant_data type: {type(variant_data)}")
+        logger.info(f"Received variant_data: {variant_data}")
+
+        # Handle case where variant_data might be an integer (variant_id)
+        if isinstance(variant_data, int):
+            return Response({
+                'success': False,
+                'message': 'Invalid variant data format. Expected variant object, got variant ID.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not variant_data or not isinstance(variant_data, dict) or not variant_data.get('solution'):
             return Response({
                 'success': False,
                 'message': 'Variant data is required'
@@ -641,13 +666,21 @@ class CommitTimetableVariantView(generics.CreateAPIView):
 
             # Create sessions from variant solution
             sessions_created = 0
-            for session_data in variant_data['solution']:
+            solution_sessions = variant_data['solution'].get('sessions', [])
+            for session_data in solution_sessions:
                 try:
                     # Get related objects
                     subject = Subject.objects.get(id=session_data['subject_id'])
                     teacher = Teacher.objects.get(id=session_data['teacher_id'])
                     room = Room.objects.get(id=session_data['room_id'])
                     class_group = ClassGroup.objects.get(id=session_data['class_group_id'])
+
+                    # Calculate end time (assuming 1-hour sessions)
+                    from datetime import datetime, timedelta
+                    start_time = datetime.strptime(session_data['start_time'], '%H:%M:%S').time()
+                    start_datetime = datetime.combine(datetime.today(), start_time)
+                    end_datetime = start_datetime + timedelta(hours=1)
+                    end_time = end_datetime.time()
 
                     # Create session
                     TimetableSession.objects.create(
@@ -657,8 +690,8 @@ class CommitTimetableVariantView(generics.CreateAPIView):
                         room=room,
                         class_group=class_group,
                         day_of_week=session_data['day_of_week'],
-                        start_time=session_data['start_time'],
-                        end_time=session_data['end_time']
+                        start_time=start_time,
+                        end_time=end_time
                     )
                     sessions_created += 1
 

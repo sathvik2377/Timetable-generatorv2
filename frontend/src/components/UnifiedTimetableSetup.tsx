@@ -403,6 +403,86 @@ export default function UnifiedTimetableSetup({
     }
   }
 
+  const handleCreateDirectTimetable = async () => {
+    setIsGenerating(true)
+    try {
+      // First load sample data
+      loadSampleData()
+
+      // Wait a moment for state to update
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      toast.loading('Creating unified timetable with complete sample data...')
+
+      // Generate timetable with sample data
+      const response = await fetch('/api/scheduler/generate-variants/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${document.cookie.split('access_token=')[1]?.split(';')[0]}`
+        },
+        body: JSON.stringify({
+          institution_id: 1,
+          name: `Unified Setup Complete Sample - ${new Date().toLocaleDateString()}`,
+          parameters: {
+            institution_name: 'Unified Demo University',
+            institution_type: 'university',
+            branches: 5,
+            subjects: 20,
+            teachers: 25,
+            rooms: 20,
+            start_time: '08:00',
+            end_time: '18:00',
+            lunch_start: '12:00',
+            lunch_end: '13:00',
+            working_days: [1, 2, 3, 4, 5],
+            generate_per_branch: true, // Enable branch-specific generation
+            unified_mode: true,
+            comprehensive_setup: true
+          }
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.variants.length > 0) {
+          // Automatically commit the first variant
+          const firstVariant = data.variants[0]
+
+          const commitResponse = await fetch('/api/scheduler/commit-variant/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${document.cookie.split('access_token=')[1]?.split(';')[0]}`
+            },
+            body: JSON.stringify({
+              variant: firstVariant,
+              name: `Unified Complete Sample - ${new Date().toLocaleDateString()}`,
+              institution_id: 1
+            })
+          })
+
+          if (commitResponse.ok) {
+            toast.success('Unified complete sample timetable created successfully!')
+            // Move to final step
+            setCurrentStep(5)
+          } else {
+            toast.error('Failed to create unified sample timetable')
+          }
+        } else {
+          toast.error('Failed to generate unified sample timetable')
+        }
+      } else {
+        toast.error('Failed to generate unified sample timetable')
+      }
+    } catch (error) {
+      console.error('Error creating direct unified timetable:', error)
+      toast.error('Error creating unified sample timetable')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   // Create a fallback schedule when optimization fails
   const createFallbackSchedule = (branch: BranchData) => {
     const schedule: Record<string, Record<string, any>> = {}
@@ -1072,23 +1152,43 @@ export default function UnifiedTimetableSetup({
               </div>
 
               <div className="mt-6 text-center">
-                <button
-                  onClick={generateTimetables}
-                  disabled={isGenerating}
-                  className="bg-gradient-to-r from-purple-500 to-blue-600 text-white px-8 py-3 rounded-lg flex items-center space-x-3 mx-auto disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-600 hover:to-blue-700 transition-all duration-300"
-                >
-                  {isGenerating ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Generating Timetables...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5" />
-                      <span>Generate Intelligent Timetables</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <button
+                    onClick={generateTimetables}
+                    disabled={isGenerating}
+                    className="bg-gradient-to-r from-purple-500 to-blue-600 text-white px-8 py-3 rounded-lg flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-600 hover:to-blue-700 transition-all duration-300"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Generating Timetables...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5" />
+                        <span>Generate Intelligent Timetables</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleCreateDirectTimetable}
+                    disabled={isGenerating}
+                    className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-3 rounded-lg flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed hover:from-green-600 hover:to-emerald-700 transition-all duration-300"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Database className="w-5 h-5" />
+                        <span>Create Complete Sample</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

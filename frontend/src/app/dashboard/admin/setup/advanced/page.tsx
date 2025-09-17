@@ -182,7 +182,7 @@ function AdvancedSetupPage() {
       '15:00-16:00', '16:00-17:00', '17:00-18:00', '18:00-19:00'
     ]
     
-    const schedule = []
+    const schedule: any[] = []
     
     timeSlots.forEach((time, timeIndex) => {
       const row: any = { Time: time }
@@ -695,10 +695,14 @@ function AdvancedSetupPage() {
       {showVariantSelector && (
         <TimetableVariantSelector
           variants={variants}
+          isOpen={showVariantSelector}
           onClose={() => setShowVariantSelector(false)}
-          onRegenerate={handleRegenerateVariants}
+          onSelectVariant={(variant) => {
+            console.log('Selected variant:', variant);
+            setShowVariantSelector(false);
+          }}
+          onRegenerateVariants={handleRegenerateVariants}
           isRegenerating={isRegenerating}
-          setupMode="advanced"
         />
       )}
     </div>

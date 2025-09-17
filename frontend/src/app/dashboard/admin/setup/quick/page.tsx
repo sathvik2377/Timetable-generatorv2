@@ -143,7 +143,7 @@ export default function QuickSetupPage() {
 
   const handleSelectVariant = async (variant: any) => {
     try {
-      const response = await commitTimetableVariant(variant.variant_id, 'quick')
+      const response = await commitTimetableVariant(variant, `Quick Setup - ${new Date().toLocaleDateString()}`)
 
       if (response.data.success) {
         toast.success('Timetable variant committed successfully!')
@@ -189,6 +189,59 @@ export default function QuickSetupPage() {
     }
   }
 
+  const handleCreateDirectTimetable = async () => {
+    setIsGenerating(true)
+    try {
+      // First load sample data
+      handleUseSampleData()
+
+      // Wait a moment for state to update
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      toast.loading('Creating timetable with sample data...')
+
+      // Generate timetable with sample data
+      const response = await generateTimetableVariants('quick', {
+        institution_id: 1,
+        name: `Quick Setup Sample - ${new Date().toLocaleDateString()}`,
+        parameters: {
+          institution_name: 'Demo High School',
+          institution_type: 'school',
+          branches: 3,
+          subjects: 8,
+          teachers: 6,
+          rooms: 6,
+          start_time: '09:00',
+          end_time: '16:00',
+          lunch_start: '12:00',
+          lunch_end: '13:00',
+          working_days: [1, 2, 3, 4, 5],
+          generate_per_branch: true // Enable branch-specific generation
+        }
+      })
+
+      if (response.data.success && response.data.variants.length > 0) {
+        // Automatically commit the first variant
+        const firstVariant = response.data.variants[0]
+        const commitResponse = await commitTimetableVariant(firstVariant, `Quick Sample Timetable - ${new Date().toLocaleDateString()}`)
+
+        if (commitResponse.data.success) {
+          toast.success('Sample timetable created successfully!')
+          router.push('/dashboard/admin')
+        } else {
+          toast.error('Failed to create sample timetable')
+        }
+      } else {
+        toast.error('Failed to generate sample timetable')
+      }
+    } catch (error) {
+      console.error('Error creating direct timetable:', error)
+      toast.error('Error creating sample timetable')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const generateRealisticSchedule = () => {
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
     const subjects = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Geography', 'Computer Science']
@@ -197,7 +250,7 @@ export default function QuickSetupPage() {
       '13:00-14:00', '14:00-15:00', '15:00-16:00'
     ]
     
-    const schedule = []
+    const schedule: any[] = []
     
     timeSlots.forEach((time, timeIndex) => {
       const row: any = { Time: time }
@@ -407,8 +460,8 @@ export default function QuickSetupPage() {
             </div>
           </div>
 
-          {/* Generate Button */}
-          <div className="mt-8 flex justify-center">
+          {/* Generate Buttons */}
+          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -425,6 +478,26 @@ export default function QuickSetupPage() {
                 <>
                   <Play className="w-5 h-5" />
                   <span>Generate Timetable</span>
+                </>
+              )}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleCreateDirectTimetable}
+              disabled={isGenerating}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-lg flex items-center space-x-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold"
+            >
+              {isGenerating ? (
+                <>
+                  <div className="spinner" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <>
+                  <Database className="w-5 h-5" />
+                  <span>Create with Sample Data</span>
                 </>
               )}
             </motion.button>
