@@ -218,6 +218,40 @@ export default function HowToUsePage() {
                 </div>
               </div>
 
+              {/* Interactive Demo Section */}
+              <div className="glass-card p-8 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold text-white mb-4">🚀 Try Our Interactive Demo</h3>
+                  <p className="text-gray-300 mb-6 max-w-2xl mx-auto">
+                    Experience the complete timetable generation process with our step-by-step interactive demo.
+                    Set up your institution, configure resources, and watch our points-based algorithm create
+                    perfect schedules in real-time.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <div className="flex items-center space-x-2 text-green-400">
+                      <CheckCircle className="w-5 h-5" />
+                      <span>No login required</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-green-400">
+                      <CheckCircle className="w-5 h-5" />
+                      <span>Real-time validation</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-green-400">
+                      <CheckCircle className="w-5 h-5" />
+                      <span>Export functionality</span>
+                    </div>
+                  </div>
+                  <div className="mt-6">
+                    <button
+                      onClick={() => router.push('/demo-interactive')}
+                      className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-3 rounded-lg font-semibold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105"
+                    >
+                      🎯 Launch Interactive Demo
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="glass-card p-8">
                 <h3 className="text-2xl font-bold text-white mb-6">Getting Started</h3>
                 <div className="grid md:grid-cols-3 gap-6">

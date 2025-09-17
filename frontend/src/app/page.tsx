@@ -116,7 +116,7 @@ export default function HomePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.3 }}
-            className="mb-8"
+            className="mb-8 flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             <Link href="/how-to-use">
               <motion.button
@@ -125,6 +125,16 @@ export default function HomePage() {
                 className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-3 rounded-lg font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
               >
                 📚 Complete Guide & Setup Instructions
+              </motion.button>
+            </Link>
+
+            <Link href="/demo-interactive">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-3 rounded-lg font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
+              >
+                🚀 Try Interactive Demo
               </motion.button>
             </Link>
           </motion.div>

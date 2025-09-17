@@ -59,9 +59,9 @@ module.exports = {
         // Subject type colors
         subject: {
           core: "#3B82F6",      // Blue
-          elective: "#10B981",  // Green
+          elective: "#8B5CF6",  // Purple
           lab: "#F59E0B",       // Orange
-          skill: "#8B5CF6",     // Purple
+          skill: "#6366F1",     // Indigo
           project: "#EF4444",   // Red
         }
       },

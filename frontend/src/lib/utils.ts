@@ -25,9 +25,9 @@ export function formatDate(date: string | Date): string {
 export function getSubjectTypeColor(type: string): string {
   const colors = {
     core: 'bg-blue-500/20 border-blue-500/30 text-blue-100',
-    elective: 'bg-green-500/20 border-green-500/30 text-green-100',
+    elective: 'bg-purple-500/20 border-purple-500/30 text-purple-100',
     lab: 'bg-orange-500/20 border-orange-500/30 text-orange-100',
-    skill: 'bg-purple-500/20 border-purple-500/30 text-purple-100',
+    skill: 'bg-indigo-500/20 border-indigo-500/30 text-indigo-100',
     project: 'bg-red-500/20 border-red-500/30 text-red-100',
   }
   return colors[type as keyof typeof colors] || colors.core

@@ -83,7 +83,7 @@ export function TodoList({ className = '' }: TodoListProps) {
     switch (priority) {
       case 'high': return 'text-red-400 border-red-400'
       case 'medium': return 'text-yellow-400 border-yellow-400'
-      case 'low': return 'text-green-400 border-green-400'
+      case 'low': return 'text-blue-400 border-blue-400'
       default: return 'text-gray-400 border-gray-400'
     }
   }
@@ -216,8 +216,8 @@ export function TodoList({ className = '' }: TodoListProps) {
                   onClick={() => toggleTodo(todo.id)}
                   className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                     todo.completed
-                      ? 'bg-green-500 border-green-500'
-                      : 'border-gray-400 hover:border-green-400'
+                      ? 'bg-purple-500 border-purple-500'
+                      : 'border-gray-400 hover:border-purple-400'
                   }`}
                 >
                   {todo.completed && <Check className="w-3 h-3 text-white" />}

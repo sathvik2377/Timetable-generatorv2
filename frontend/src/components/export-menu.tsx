@@ -51,8 +51,8 @@ export function ExportMenu({ timetableId, institutionId, timetable, type = 'time
       label: 'Excel Spreadsheet',
       description: 'Editable spreadsheet format for further analysis',
       icon: FileSpreadsheet,
-      color: 'text-green-400',
-      bgColor: 'bg-green-500/20'
+      color: 'text-emerald-400',
+      bgColor: 'bg-emerald-500/20'
     },
     {
       id: 'png',

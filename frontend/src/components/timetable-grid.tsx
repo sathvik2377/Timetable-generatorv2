@@ -93,7 +93,7 @@ export function TimetableGrid({ timetable, editable = false, viewType = 'general
 
         {/* Priority indicator */}
         <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-          isCore ? 'bg-blue-400' : isLab ? 'bg-orange-400' : 'bg-green-400'
+          isCore ? 'bg-blue-400' : isLab ? 'bg-orange-400' : 'bg-purple-400'
         } animate-pulse`} />
 
         <div className="space-y-1.5 relative z-10">

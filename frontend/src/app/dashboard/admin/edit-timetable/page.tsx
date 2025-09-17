@@ -314,7 +314,7 @@ export default function AdminEditTimetablePage() {
   const handleExport = (format: 'html' | 'csv' | 'pdf') => {
     const currentBranch = branches.find(b => b.id === selectedBranch);
     const filename = `${currentBranch?.name || 'timetable'}-${format}`;
-    
+
     if (format === 'html') {
       const htmlContent = generateHTMLExport();
       const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -323,6 +323,12 @@ export default function AdminEditTimetablePage() {
       const csvContent = generateCSVExport();
       const blob = new Blob([csvContent], { type: 'text/csv' });
       downloadFile(blob, `${filename}.csv`);
+    } else if (format === 'pdf') {
+      // For now, export as HTML which can be printed to PDF
+      const htmlContent = generateHTMLExport();
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      downloadFile(blob, `${filename}.html`);
+      alert('HTML file downloaded. You can print this to PDF using your browser.');
     }
   };
 

@@ -581,13 +581,13 @@ export default function AboutPage() {
             </p>
             
             <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/login?role=admin">
+              <Link href="/demo-interactive">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-3 rounded-lg flex items-center space-x-2 font-medium"
                 >
-                  <span>Try Demo</span>
+                  <span>Try Interactive Demo</span>
                   <ArrowRight className="w-4 h-4" />
                 </motion.button>
               </Link>
