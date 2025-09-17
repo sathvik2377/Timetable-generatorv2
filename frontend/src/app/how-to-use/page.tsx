@@ -501,17 +501,17 @@ export default function HowToUsePage() {
                   <div className="bg-blue-500/20 p-4 rounded-lg">
                     <h4 className="font-semibold text-blue-400 mb-2">Admin Access</h4>
                     <p className="text-sm text-gray-300">Email: admin@demo.local</p>
-                    <p className="text-sm text-gray-300">Password: demo123</p>
+                    <p className="text-sm text-gray-300">Password: Admin@1234</p>
                   </div>
                   <div className="bg-green-500/20 p-4 rounded-lg">
                     <h4 className="font-semibold text-green-400 mb-2">Faculty Access</h4>
                     <p className="text-sm text-gray-300">Email: faculty@demo.local</p>
-                    <p className="text-sm text-gray-300">Password: demo123</p>
+                    <p className="text-sm text-gray-300">Password: Faculty@123</p>
                   </div>
                   <div className="bg-purple-500/20 p-4 rounded-lg">
                     <h4 className="font-semibold text-purple-400 mb-2">Student Access</h4>
                     <p className="text-sm text-gray-300">Email: student@demo.local</p>
-                    <p className="text-sm text-gray-300">Password: demo123</p>
+                    <p className="text-sm text-gray-300">Password: Student@123</p>
                   </div>
                 </div>
               </div>

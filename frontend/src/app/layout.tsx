@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Footer } from '@/components/footer'
 import { Toaster } from 'react-hot-toast'
+import { AuthProvider } from '@/lib/auth'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -33,20 +34,22 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="min-h-screen bg-grid-pattern">
-            {children}
-            <Footer />
-          </div>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              className: 'glass-card',
-              style: {
-                backdropFilter: 'blur(10px)',
-              },
-            }}
-          />
+          <AuthProvider>
+            <div className="min-h-screen bg-grid-pattern">
+              {children}
+              <Footer />
+            </div>
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                className: 'glass-card',
+                style: {
+                  backdropFilter: 'blur(10px)',
+                },
+              }}
+            />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

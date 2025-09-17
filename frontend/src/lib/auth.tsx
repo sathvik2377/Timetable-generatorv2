@@ -1,3 +1,4 @@
+import React from 'react'
 import Cookies from 'js-cookie'
 import { jwtDecode } from 'jwt-decode'
 
@@ -137,7 +138,7 @@ class AuthService {
     if (!refreshToken) return false
 
     try {
-      const response = await fetch('http://localhost:8000/api/token/refresh/', {
+      const response = await fetch('http://localhost:8000/api/auth/token/refresh/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +168,7 @@ class AuthService {
     try {
       const refreshToken = this.getRefreshToken()
       if (refreshToken) {
-        await fetch('http://localhost:8000/api/token/blacklist/', {
+        await fetch('http://localhost:8000/api/auth/token/blacklist/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -202,19 +203,67 @@ class AuthService {
 
 export const authService = AuthService.getInstance()
 
+// Create a React context for authentication
+const AuthContext = React.createContext<{
+  user: User | null
+  isAuthenticated: boolean
+  isAdmin: boolean
+  isFaculty: boolean
+  isStudent: boolean
+  hasRole: (roles: string[]) => boolean
+  canAccessRoute: (pathname: string) => boolean
+  logout: () => Promise<void>
+  getAuthHeaders: () => Record<string, string>
+  refreshAuth: () => void
+} | null>(null)
+
+// AuthProvider component
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [authState, setAuthState] = React.useState({
+    user: null as User | null,
+    isAuthenticated: false,
+  })
+
+  const refreshAuth = React.useCallback(() => {
+    const user = authService.getUser()
+    const isAuthenticated = authService.isAuthenticated()
+    setAuthState({ user, isAuthenticated })
+  }, [])
+
+  React.useEffect(() => {
+    refreshAuth()
+  }, [refreshAuth])
+
+  const contextValue = React.useMemo(() => ({
+    user: authState.user,
+    isAuthenticated: authState.isAuthenticated,
+    isAdmin: authState.user?.role === 'admin',
+    isFaculty: authState.user?.role === 'faculty',
+    isStudent: authState.user?.role === 'student',
+    hasRole: (roles: string[]) => authState.user?.role ? roles.includes(authState.user.role) : false,
+    canAccessRoute: (pathname: string) => authService.canAccessRoute(pathname),
+    logout: async () => {
+      await authService.logout()
+      setAuthState({ user: null, isAuthenticated: false })
+    },
+    getAuthHeaders: () => authService.getAuthHeaders(),
+    refreshAuth,
+  }), [authState, refreshAuth])
+
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
 // React hook for using auth in components
 export function useAuth() {
-  return {
-    user: authService.getUser(),
-    isAuthenticated: authService.isAuthenticated(),
-    isAdmin: authService.isAdmin(),
-    isFaculty: authService.isFaculty(),
-    isStudent: authService.isStudent(),
-    hasRole: (roles: string[]) => authService.hasRole(roles),
-    canAccessRoute: (pathname: string) => authService.canAccessRoute(pathname),
-    logout: () => authService.logout(),
-    getAuthHeaders: () => authService.getAuthHeaders(),
+  const context = React.useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
   }
+  return context
 }
 
 // Route guard component
@@ -223,16 +272,47 @@ export function withAuth<P extends object>(
   requiredRoles?: string[]
 ) {
   return function AuthGuardedComponent(props: P) {
-    const auth = useAuth()
+    const [isLoading, setIsLoading] = React.useState(true)
+    const [authState, setAuthState] = React.useState({
+      isAuthenticated: false,
+      user: null as User | null,
+    })
 
-    if (!auth.isAuthenticated) {
+    React.useEffect(() => {
+      // Check authentication on component mount
+      const checkAuth = () => {
+        const isAuth = authService.isAuthenticated()
+        const user = authService.getUser()
+
+        setAuthState({
+          isAuthenticated: isAuth,
+          user: user,
+        })
+        setIsLoading(false)
+      }
+
+      checkAuth()
+    }, [])
+
+    if (isLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-white">Loading...</p>
+          </div>
+        </div>
+      )
+    }
+
+    if (!authState.isAuthenticated) {
       if (typeof window !== 'undefined') {
         window.location.href = '/login'
       }
       return null
     }
 
-    if (requiredRoles && !auth.hasRole(requiredRoles)) {
+    if (requiredRoles && authState.user && !requiredRoles.includes(authState.user.role)) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
           <div className="text-center">

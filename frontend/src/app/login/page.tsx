@@ -7,7 +7,7 @@ import { Eye, EyeOff, LogIn, ArrowLeft, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import axios from 'axios' // <-- Add this import
 import { ThemeToggle } from '@/components/theme-toggle'
-import Cookies from 'js-cookie'
+import { authService, useAuth } from '@/lib/auth'
 import toast from 'react-hot-toast'
 
 export default function LoginPage() {
@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const auth = useAuth()
 
   // Set default credentials based on role
   useEffect(() => {
@@ -48,21 +49,18 @@ export default function LoginPage() {
         password: formData.password
       })
 
-      // Store tokens (JWT endpoint returns access and refresh directly)
-      Cookies.set('access_token', response.data.access, { expires: 1 })
-      Cookies.set('refresh_token', response.data.refresh, { expires: 7 })
-
-      // Create user object from token (we'll need to get user data separately)
-      const userRole = formData.email.includes('admin') ? 'admin' :
-                      formData.email.includes('faculty') ? 'faculty' : 'student'
-      const userData = {
-        id: 1,
-        email: formData.email,
-        role: userRole,
-        first_name: userRole.charAt(0).toUpperCase() + userRole.slice(1),
-        last_name: 'User'
+      // Extract user data from response
+      const userData = response.data.user
+      const tokens = {
+        access: response.data.access_token,
+        refresh: response.data.refresh_token
       }
-      localStorage.setItem('user', JSON.stringify(userData))
+
+      // Use AuthService to properly set authentication
+      authService.setAuth(userData, tokens)
+
+      // Refresh the auth context
+      auth.refreshAuth()
 
       toast.success(`Welcome back, ${userData.first_name}!`)
 
@@ -72,7 +70,7 @@ export default function LoginPage() {
         faculty: '/dashboard/faculty',
         student: '/dashboard/student'
       }
-      const redirectPath = redirectMap[userRole] || '/dashboard'
+      const redirectPath = redirectMap[userData.role as keyof typeof redirectMap] || '/dashboard'
 
       router.push(redirectPath)
 
