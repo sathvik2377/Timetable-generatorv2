@@ -256,7 +256,7 @@ export function generateRealisticDemoData(): RealisticDemoData {
       address: 'Sector 15, Knowledge Park, Greater Noida, Uttar Pradesh 201310',
       phone: '+91-120-2345678',
       email: 'info@bite.edu.in',
-      academicYear: '2024-25',
+      academicYear: '2025-26',
       currentSemester: 5
     },
     branches,

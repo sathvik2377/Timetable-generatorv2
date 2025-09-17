@@ -97,7 +97,7 @@ export default function UnifiedTimetableSetup({
   }, [externalIsGenerating])
   const [instituteData, setInstituteData] = useState<InstituteData>({
     name: '',
-    academicYear: '2024-25',
+    academicYear: '2025-26',
     semester: 1,
     numberOfBranches: 0
   })
@@ -554,7 +554,7 @@ export default function UnifiedTimetableSetup({
     // Set institute data
     setInstituteData({
       name: 'Bharatiya Shiksha Sansthan',
-      academicYear: '2024-25',
+      academicYear: '2025-26',
       semester: 1,
       numberOfBranches: 3
     })
@@ -667,8 +667,8 @@ export default function UnifiedTimetableSetup({
                   onChange={(e) => setInstituteData({...instituteData, academicYear: e.target.value})}
                   className="w-full px-4 py-3 glass-card border border-purple-500/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <option value="2024-25">2024-25</option>
                   <option value="2025-26">2025-26</option>
+                  <option value="2026-27">2026-27</option>
                   <option value="2026-27">2026-27</option>
                 </select>
               </div>

@@ -60,7 +60,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       address: '',
       phone: '',
       email: '',
-      academic_year: '2024-25',
+      academic_year: '2025-26',
       start_time: '09:00',
       end_time: '17:00',
       slot_duration: 60,
@@ -533,7 +533,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                     institution: { ...prev.institution, academic_year: e.target.value }
                   }))}
                   className="w-full px-4 py-3 glass-card border-0 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="2024-25"
+                  placeholder="2025-26"
                 />
               </div>
               

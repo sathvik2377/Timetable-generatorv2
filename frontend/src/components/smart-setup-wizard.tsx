@@ -78,7 +78,7 @@ export function SmartSetupWizard({ onComplete, onCancel }: SmartSetupWizardProps
     type: 'college',
     level: 'undergraduate',
     numberOfBranches: 1,
-    academicYear: '2024-25',
+    academicYear: '2025-26',
     semester: 1
   })
   const [branches, setBranches] = useState<BranchConfig[]>([])
@@ -444,7 +444,7 @@ export function SmartSetupWizard({ onComplete, onCancel }: SmartSetupWizardProps
                   value={institutionConfig.academicYear}
                   onChange={(e) => setInstitutionConfig(prev => ({ ...prev, academicYear: e.target.value }))}
                   className="w-full px-4 py-3 glass border rounded-lg text-primary placeholder-muted focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="2024-25"
+                  placeholder="2025-26"
                 />
               </div>
 
