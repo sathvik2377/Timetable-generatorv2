@@ -36,6 +36,7 @@ export default function HomePage() {
           </motion.div>
           
           <div className="flex items-center space-x-4">
+
             <Link href="/nep-2020">
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -43,6 +44,15 @@ export default function HomePage() {
                 className="glass-button text-sm"
               >
                 NEP 2020
+              </motion.button>
+            </Link>
+            <Link href="/demo-interactive">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="glass-button text-sm"
+              >
+                Direct Timetable
               </motion.button>
             </Link>
 

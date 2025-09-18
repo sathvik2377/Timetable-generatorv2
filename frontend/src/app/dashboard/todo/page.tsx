@@ -40,10 +40,16 @@ export default function TodoPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null)
-  const [newTodo, setNewTodo] = useState({
+  const [newTodo, setNewTodo] = useState<{
+    title: string
+    description: string
+    priority: 'low' | 'medium' | 'high'
+    category: string
+    dueDate: string
+  }>({
     title: '',
     description: '',
-    priority: 'medium' as const,
+    priority: 'medium',
     category: 'General',
     dueDate: ''
   })
@@ -196,7 +202,7 @@ export default function TodoPage() {
   const pendingCount = todos.filter(todo => !todo.completed).length
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-neutral-950/90">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -226,7 +232,7 @@ export default function TodoPage() {
         </div>
 
         {/* Filters and Search */}
-        <div className="glass-card p-6 mb-8">
+  <div className="glass-card p-6 mb-8 bg-white/5">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted w-4 h-4" />

@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+
+
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Play, 
@@ -26,6 +28,10 @@ import * as XLSX from 'xlsx'
 
 interface FormData {
   collegeName: string
+  collegeStartTime: string // e.g. '09:00'
+  collegeEndTime: string   // e.g. '17:00'
+  lunchStartTime: string   // e.g. '13:00'
+  lunchEndTime: string     // e.g. '14:00'
   workingHours: number
   workingDays: string[]
   maxClassHours: number
@@ -83,12 +89,18 @@ const DEMO_SUBJECTS = [
 ]
 
 export default function DemoInteractivePage() {
+  // Colorful/simple view toggle state
+  const [simpleView, setSimpleView] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationStep, setGenerationStep] = useState('')
   const [generationProgress, setGenerationProgress] = useState(0)
   const [formData, setFormData] = useState<FormData>({
     collegeName: '',
+    collegeStartTime: '09:00',
+    collegeEndTime: '17:00',
+    lunchStartTime: '13:00',
+    lunchEndTime: '14:00',
     workingHours: 6,
     workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
     maxClassHours: 25,
@@ -162,6 +174,12 @@ export default function DemoInteractivePage() {
       case 0:
         if (!formData.collegeName.trim()) {
           errors.collegeName = 'College name is required'
+        }
+        if (!formData.collegeStartTime || !formData.collegeEndTime) {
+          errors.collegeTime = 'College start and end time are required'
+        }
+        if (!formData.lunchStartTime || !formData.lunchEndTime) {
+          errors.lunchTime = 'Lunch break start and end time are required'
         }
         if (formData.workingHours < 1 || formData.workingHours > 12) {
           errors.workingHours = 'Working hours must be between 1 and 12'
@@ -327,100 +345,167 @@ export default function DemoInteractivePage() {
       for (let i = 0; i < generationSteps.length; i++) {
         setGenerationStep(generationSteps[i])
         setGenerationProgress(((i + 1) / generationSteps.length) * 100)
-
-        // Simulate different processing times for realism
-        const delay = i === 3 ? 2000 : i === 4 ? 1500 : 1000 // OR-Tools step takes longer
+        const delay = i === 3 ? 2000 : i === 4 ? 1500 : 1000
         await new Promise(resolve => setTimeout(resolve, delay))
       }
 
-      // Generate timetables for all branches using enhanced points system
+      // --- NEW LOGIC: Ensure unique, non-overlapping timetables per branch ---
       const newBranchTimetables: BranchTimetable[] = []
-
+      const globalAssignments: { [key: string]: { [key: string]: Set<string> } } = {}
+      const globalRoomAssignments: { [key: string]: { [key: string]: Set<string> } } = {}
+      for (const day of formData.workingDays) {
+        globalAssignments[day] = {}
+        globalRoomAssignments[day] = {}
+        for (const timeSlot of TIME_SLOTS.slice(0, formData.workingHours)) {
+          globalAssignments[day][timeSlot] = new Set()
+          globalRoomAssignments[day][timeSlot] = new Set()
+        }
+      }
+      const branchRooms: string[][] = formData.branches.map((_, idx) => {
+        return Array.from({ length: formData.workingHours }, (_, i) => `Room ${101 + idx * 10 + i}`)
+      })
+      const parseTime = (t: string) => {
+        const [h, m] = t.split(":").map(Number); return h * 60 + m;
+      };
+      const lunchStart = parseTime(formData.lunchStartTime);
+      let lunchSlotIdx = TIME_SLOTS.findIndex(slot => {
+        const [start] = slot.split("-");
+        return parseTime(start) === lunchStart;
+      });
+      // If not found, fallback to middle slot
+      if (lunchSlotIdx === -1) lunchSlotIdx = Math.floor(formData.workingHours / 2);
       for (let branchIndex = 0; branchIndex < formData.branches.length; branchIndex++) {
-        const branch = formData.branches[branchIndex]
-        const branchTimetable: TimetableEntry[] = []
-
-        // Reset teacher points for each branch
-        const teacherPoints: { [key: string]: number } = {}
-        const teacherWorkload: { [key: string]: number } = {}
-
-        // Initialize teacher points and workload tracking
+        const branch = formData.branches[branchIndex];
+        const branchTimetable: TimetableEntry[] = [];
+        const teacherPoints: { [key: string]: number } = {};
+        const teacherWorkload: { [key: string]: number } = {};
         formData.teachers.forEach(teacher => {
           if (teacher.code && teacher.name) {
-            teacherPoints[teacher.code] = formData.maxTeacherHours * 100 * formData.workingDays.length
-            teacherWorkload[teacher.code] = 0
+            teacherPoints[teacher.code] = formData.maxTeacherHours * 100 * formData.workingDays.length;
+            teacherWorkload[teacher.code] = 0;
           }
-        })
-
-        let hoursScheduled = 0
-        const targetHours = formData.maxClassHours
-        const dailyHoursLimit = Math.ceil(targetHours / formData.workingDays.length)
-
-        // Generate unique schedule for each branch
+        });
+        let hoursScheduled = 0;
+        const targetHours = formData.maxClassHours;
+        const days = formData.workingDays.length;
+        let hoursLeft = targetHours;
         for (const day of formData.workingDays) {
-          let dailyHours = 0
-
-          for (const timeSlot of TIME_SLOTS.slice(0, formData.workingHours)) {
-            if (hoursScheduled >= targetHours || dailyHours >= dailyHoursLimit) break
-
-            // Add some randomization to create different schedules per branch
-            const shuffledTeachers = [...formData.teachers]
-              .filter(teacher => teacher.code && teacherPoints[teacher.code] >= 100)
-              .sort((a, b) => {
-                // Add branch-specific randomization
-                const randomFactor = (branchIndex + 1) * Math.sin(hoursScheduled + branchIndex)
-                return (teacherWorkload[a.code] + randomFactor) - (teacherWorkload[b.code] + randomFactor)
-              })
-
-            const selectedTeacher = shuffledTeachers[0]
-
-            if (selectedTeacher) {
-              teacherPoints[selectedTeacher.code] -= 100
-              teacherWorkload[selectedTeacher.code]++
-
+          let dailyClassHours = Math.floor(targetHours / days);
+          if (formData.workingDays.indexOf(day) < (targetHours % days)) {
+            dailyClassHours += 1;
+          }
+          let scheduledThisDay = 0;
+          for (let slotIdx = 0; slotIdx < formData.workingHours; slotIdx++) {
+            const timeSlot = TIME_SLOTS[slotIdx];
+            // Insert lunch break at correct slot (always)
+            if (slotIdx === lunchSlotIdx) {
+              branchTimetable.push({
+                day,
+                timeSlot,
+                subject: 'Lunch Break',
+                teacher: '',
+                room: 'Cafeteria',
+                branchId: branch.code,
+                color: SUBJECT_COLORS['Lunch Break']
+              });
+              continue;
+            }
+            if (scheduledThisDay >= dailyClassHours) {
+              branchTimetable.push({
+                day,
+                timeSlot,
+                subject: '',
+                teacher: '',
+                room: '',
+                branchId: branch.code,
+                color: ''
+              });
+              continue;
+            }
+            let availableTeachers = formData.teachers.filter(teacher =>
+              teacher.code &&
+              teacherPoints[teacher.code] >= 100 &&
+              !globalAssignments[day][timeSlot].has(teacher.code)
+            );
+            // If no teacher is available, allow reuse (rotate through teachers)
+            if (availableTeachers.length === 0) {
+              availableTeachers = formData.teachers.filter(teacher => teacher.code);
+            }
+            availableTeachers.sort(() => Math.random() - 0.5);
+            const selectedTeacher = availableTeachers[0];
+            const room = branchRooms[branchIndex][slotIdx];
+            if (
+              selectedTeacher &&
+              !globalRoomAssignments[day][timeSlot].has(room)
+            ) {
+              if (teacherPoints[selectedTeacher.code] >= 100) {
+                teacherPoints[selectedTeacher.code] -= 100;
+                teacherWorkload[selectedTeacher.code]++;
+              }
+              globalAssignments[day][timeSlot].add(selectedTeacher.code);
+              globalRoomAssignments[day][timeSlot].add(room);
               branchTimetable.push({
                 day,
                 timeSlot,
                 subject: selectedTeacher.subject,
                 teacher: selectedTeacher.name,
-                room: `Room ${Math.floor(Math.random() * 20) + 101}`,
+                room,
                 branchId: branch.code,
-                color: SUBJECT_COLORS[selectedTeacher.subject] || 'bg-gradient-to-br from-gray-500 to-gray-600 text-white'
-              })
-              hoursScheduled++
-              dailyHours++
+                color: SUBJECT_COLORS[selectedTeacher.subject] || 'bg-gray-800 text-white'
+              });
+              hoursScheduled++;
+              scheduledThisDay++;
+              // Debug log for assignment
+              console.log(`Branch ${branch.name} | Day ${day} | Slot ${timeSlot} | Teacher: ${selectedTeacher.name} | Subject: ${selectedTeacher.subject}`);
+            } else {
+              branchTimetable.push({
+                day,
+                timeSlot,
+                subject: '',
+                teacher: '',
+                room: '',
+                branchId: branch.code,
+                color: ''
+              });
+              // Debug log for empty slot
+              console.log(`Branch ${branch.name} | Day ${day} | Slot ${timeSlot} | No teacher assigned`);
             }
           }
         }
-
-        // Add lunch break if needed
-        if (formData.workingHours > 4) {
-          const lunchSlot = TIME_SLOTS[Math.floor(formData.workingHours / 2)]
-          formData.workingDays.forEach(day => {
-            branchTimetable.push({
-              day,
-              timeSlot: lunchSlot,
-              subject: 'Lunch Break',
-              teacher: '',
-              room: 'Cafeteria',
-              branchId: branch.code,
-              color: SUBJECT_COLORS['Lunch Break']
-            })
-          })
-        }
-
+        // Debug log for branch timetable
+        console.log(`Timetable for branch ${branch.name}:`, branchTimetable);
         newBranchTimetables.push({
           branchId: branch.code,
           branchName: branch.name,
           entries: branchTimetable
-        })
+        });
       }
-
       setBranchTimetables(newBranchTimetables)
       setCurrentBranchIndex(0)
       setIsGenerating(false)
       setCurrentStep(4)
       toast.success(`Generated ${newBranchTimetables.length} unique timetables successfully!`)
+
+      // Auto-download PDF with all branches, one per page
+      setTimeout(async () => {
+        const jsPDF = (await import('jspdf')).default;
+        const html2canvas = (await import('html2canvas')).default;
+        const pdf = new jsPDF('l', 'mm', 'a4');
+        for (let i = 0; i < newBranchTimetables.length; i++) {
+          setCurrentBranchIndex(i);
+          await new Promise(r => setTimeout(r, 500)); // Wait for DOM update
+          const el = document.getElementById('timetable-display');
+          if (el) {
+            const canvas = await html2canvas(el, { backgroundColor: '#f3f4f6', scale: 2, logging: false });
+            const imgData = canvas.toDataURL('image/png');
+            const imgWidth = 297;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            if (i > 0) pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+          }
+        }
+        pdf.save('All_Branches_Timetables.pdf');
+      }, 800);
 
     } catch (error) {
       console.error('Generation error:', error)
@@ -430,7 +515,7 @@ export default function DemoInteractivePage() {
   }
 
   // Export functionality
-  const exportTimetable = async (format: 'png' | 'pdf' | 'excel') => {
+  const exportTimetable = async (format: 'png' | 'pdf' | 'excel' | 'json' | 'plain-excel') => {
     if (branchTimetables.length === 0) {
       toast.error('No timetable to export!')
       return
@@ -442,7 +527,49 @@ export default function DemoInteractivePage() {
     const filename = `${currentBranch.branchName.replace(/\s+/g, '_')}_Timetable_${timestamp}`
 
     try {
-      if (format === 'png') {
+      if (format === 'json') {
+        // Export as JSON
+        const json = JSON.stringify(currentBranch, null, 2)
+        const blob = new Blob([json], { type: 'application/json' })
+        const link = document.createElement('a')
+        link.download = `${filename}.json`
+        link.href = URL.createObjectURL(blob)
+        link.click()
+        toast.success('JSON exported successfully!')
+      } else if (format === 'plain-excel') {
+        // Export as plain Excel (black and white, grid style)
+        const worksheetData = []
+        worksheetData.push([
+          `${currentBranch.branchName} Timetable`,
+          ...Array(formData.workingHours).fill('')
+        ])
+        worksheetData.push([
+          'Day',
+          ...TIME_SLOTS.slice(0, formData.workingHours)
+        ])
+        formData.workingDays.forEach(day => {
+          const row = [day]
+          TIME_SLOTS.slice(0, formData.workingHours).forEach(slot => {
+            const entry = currentBranch.entries.find(e => e.day === day && e.timeSlot === slot)
+            if (entry) {
+              if (entry.subject === 'Lunch Break') {
+                row.push('Lunch Break')
+              } else {
+                row.push(`${entry.subject}\n${entry.teacher}\n${entry.room}`)
+              }
+            } else {
+              row.push('-')
+            }
+          })
+          worksheetData.push(row)
+        })
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
+        // Remove all color styling by not setting any cell styles
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Timetable')
+        XLSX.writeFile(workbook, `${filename}_plain.xlsx`)
+        toast.success('Plain Excel exported successfully!')
+      } else if (format === 'png') {
         const timetableElement = document.getElementById('timetable-display')
         if (timetableElement) {
           const canvas = await html2canvas(timetableElement, {
@@ -479,15 +606,11 @@ export default function DemoInteractivePage() {
         }
       } else if (format === 'excel') {
         const worksheetData = []
-
-        // Add header
         worksheetData.push([
           `${currentBranch.branchName} Timetable`,
           '', '', '', '', ''
         ])
         worksheetData.push(['Day', 'Time', 'Subject', 'Teacher', 'Room', ''])
-
-        // Add timetable data
         currentBranch.entries.forEach(entry => {
           worksheetData.push([
             entry.day,
@@ -498,11 +621,9 @@ export default function DemoInteractivePage() {
             ''
           ])
         })
-
         const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
         const workbook = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Timetable')
-
         XLSX.writeFile(workbook, `${filename}.xlsx`)
         toast.success('Excel file exported successfully!')
       }
@@ -551,7 +672,6 @@ export default function DemoInteractivePage() {
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white mb-6">Institution Setup</h2>
-            
             <div className="space-y-4">
               <div>
                 <label className="block text-white mb-2">College Name</label>
@@ -574,6 +694,50 @@ export default function DemoInteractivePage() {
                 {formErrors.collegeName && (
                   <p className="text-red-400 text-sm mt-1">{formErrors.collegeName}</p>
                 )}
+              </div>
+
+              {/* College Timings */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white mb-2">College Start Time</label>
+                  <input
+                    type="time"
+                    value={formData.collegeStartTime}
+                    onChange={e => setFormData({...formData, collegeStartTime: e.target.value})}
+                    className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-600 focus:border-purple-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white mb-2">College End Time</label>
+                  <input
+                    type="time"
+                    value={formData.collegeEndTime}
+                    onChange={e => setFormData({...formData, collegeEndTime: e.target.value})}
+                    className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-600 focus:border-purple-400"
+                  />
+                </div>
+              </div>
+
+              {/* Lunch Break Timings */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-white mb-2">Lunch Break Start Time</label>
+                  <input
+                    type="time"
+                    value={formData.lunchStartTime}
+                    onChange={e => setFormData({...formData, lunchStartTime: e.target.value})}
+                    className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-600 focus:border-purple-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-white mb-2">Lunch Break End Time</label>
+                  <input
+                    type="time"
+                    value={formData.lunchEndTime}
+                    onChange={e => setFormData({...formData, lunchEndTime: e.target.value})}
+                    className="w-full p-3 rounded-lg bg-gray-800 text-white border border-gray-600 focus:border-purple-400"
+                  />
+                </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -886,23 +1050,24 @@ export default function DemoInteractivePage() {
       case 3:
         return (
           <div className="text-center space-y-6">
+
             <div className="relative">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-400 mx-auto"></div>
+              <div className="animate-spin h-16 w-16 border-b-4 border-gray-400 mx-auto rounded-full shadow-lg"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-purple-400 font-bold text-sm">{Math.round(generationProgress)}%</span>
+                <span className="text-gray-300 font-bold text-lg drop-shadow">{Math.round(generationProgress)}%</span>
               </div>
             </div>
 
             <h2 className="text-2xl font-bold text-white">Generating Timetable...</h2>
 
-            <div className="bg-gray-800/50 p-6 rounded-lg max-w-lg mx-auto">
-              <p className="text-purple-400 font-semibold mb-4">{generationStep}</p>
+            <div className="bg-gray-900/70 p-6 rounded-lg max-w-lg mx-auto shadow-lg">
+              <p className="text-gray-200 font-semibold mb-4">{generationStep}</p>
 
               {/* Progress Bar */}
-              <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
+              <div className="w-full bg-gray-700 h-3 mb-4 shadow-inner">
                 <div
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${generationProgress}%` }}
+                  className="bg-gradient-to-r from-purple-400 to-indigo-500 h-3 transition-all duration-700 ease-in-out shadow"
+                  style={{ width: `${generationProgress}%`, borderRadius: 0 }}
                 />
               </div>
 
@@ -911,12 +1076,12 @@ export default function DemoInteractivePage() {
                 {generationSteps.map((step, index) => (
                   <div
                     key={index}
-                    className={`p-2 rounded text-center ${
+                    className={`p-2 text-center font-semibold transition-all duration-300 ${
                       index < (generationProgress / 100) * generationSteps.length
-                        ? 'bg-green-500/20 text-green-400'
+                        ? 'bg-green-500/20 text-green-400 shadow'
                         : index === Math.floor((generationProgress / 100) * generationSteps.length)
-                        ? 'bg-purple-500/20 text-purple-400'
-                        : 'bg-gray-700/50 text-gray-500'
+                        ? 'bg-indigo-500/20 text-indigo-300 shadow'
+                        : 'bg-gray-800/50 text-gray-500'
                     }`}
                   >
                     {step.replace('...', '')}
@@ -938,7 +1103,7 @@ export default function DemoInteractivePage() {
         )
 
       case 4:
-        const currentBranch = branchTimetables[currentBranchIndex]
+        const currentBranch = branchTimetables[currentBranchIndex];
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
@@ -946,265 +1111,289 @@ export default function DemoInteractivePage() {
               <h2 className="text-2xl font-bold text-white">Timetables Generated Successfully!</h2>
               <p className="text-gray-400">Generated {branchTimetables.length} unique timetables</p>
             </div>
-
-            {/* Branch Navigation */}
-            {branchTimetables.length > 1 && (
-              <div className="flex items-center justify-center space-x-4 mb-6">
+            <h2 className="text-2xl font-bold text-white mb-6 text-center">Timetable Result</h2>
+            <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
+              <div className="flex gap-2">
                 <button
+                  className="glass-button px-4 py-2"
+                  onClick={prevStep}
+                  disabled={isGenerating}
+                >
+                  <ChevronLeft className="inline-block mr-1" /> Back
+                </button>
+                <button
+                  className="glass-button px-4 py-2"
+                  onClick={() => setCurrentStep(0)}
+                  disabled={isGenerating}
+                >
+                  Start Over
+                </button>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                  <button
+                    className="glass-button px-4 py-2"
+                    onClick={() => exportTimetable('png')}
+                    disabled={isExporting}
+                  >
+                    <Image className="inline-block mr-1" /> PNG
+                  </button>
+                  <button
+                    className="glass-button px-4 py-2"
+                    onClick={() => exportTimetable('pdf')}
+                    disabled={isExporting}
+                  >
+                    <FileText className="inline-block mr-1" /> PDF
+                  </button>
+                  <button
+                    className="glass-button px-4 py-2"
+                    onClick={() => exportTimetable('excel')}
+                    disabled={isExporting}
+                  >
+                    <FileSpreadsheet className="inline-block mr-1" /> Excel
+                  </button>
+                  <button
+                    className="glass-button px-4 py-2"
+                    onClick={() => exportTimetable('plain-excel')}
+                    disabled={isExporting}
+                  >
+                    <FileSpreadsheet className="inline-block mr-1" /> Plain Excel
+                  </button>
+                  <button
+                    className="glass-button px-4 py-2"
+                    onClick={() => exportTimetable('json')}
+                    disabled={isExporting}
+                  >
+                    <FileText className="inline-block mr-1" /> JSON
+                  </button>
+                </div>
+            </div>
+            {/* Colorful/Simple View Toggle */}
+            <div className="flex justify-end mb-2">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <span className="text-sm text-gray-500">Simple View</span>
+                <input
+                  type="checkbox"
+                  checked={simpleView}
+                  onChange={() => setSimpleView(v => !v)}
+                  className="accent-purple-500 w-5 h-5"
+                />
+              </label>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="mb-4 flex items-center space-x-4 justify-center">
+                <button
+                  className="glass-button px-4 py-2"
                   onClick={() => setCurrentBranchIndex(Math.max(0, currentBranchIndex - 1))}
                   disabled={currentBranchIndex === 0}
-                  className="p-2 rounded-lg bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors"
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronLeft className="inline-block mr-1" /> Prev Branch
                 </button>
-
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-white">{currentBranch?.branchName}</h3>
-                  <p className="text-gray-400 text-sm">
-                    Branch {currentBranchIndex + 1} of {branchTimetables.length}
-                  </p>
-                  <p className="text-purple-400 text-xs mt-1">
-                    Use ← → arrow keys to navigate
-                  </p>
-                </div>
-
+                <span className="text-white text-lg font-semibold">
+                  {branchTimetables[currentBranchIndex]?.branchName || ''}
+                </span>
                 <button
+                  className="glass-button px-4 py-2"
                   onClick={() => setCurrentBranchIndex(Math.min(branchTimetables.length - 1, currentBranchIndex + 1))}
                   disabled={currentBranchIndex === branchTimetables.length - 1}
-                  className="p-2 rounded-lg bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors"
                 >
-                  <ChevronRight className="w-5 h-5" />
+                  Next Branch <ChevronRight className="inline-block ml-1" />
                 </button>
               </div>
-            )}
-
-            {/* Enhanced Timetable Display with Colors */}
-            <div id="timetable-display" className="overflow-x-auto bg-gray-900 p-4 rounded-lg">
-              <table className="w-full bg-gray-800/50 rounded-lg overflow-hidden shadow-2xl">
-                <thead>
-                  <tr className="bg-gradient-to-r from-purple-600 to-violet-600">
-                    <th className="p-4 text-left text-white font-bold">Time</th>
-                    {formData.workingDays.map(day => (
-                      <th key={day} className="p-4 text-left text-white font-bold">{day}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {TIME_SLOTS.slice(0, formData.workingHours).map(timeSlot => (
-                    <tr key={timeSlot} className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors">
-                      <td className="p-4 text-white font-semibold bg-gray-800">{timeSlot}</td>
-                      {formData.workingDays.map(day => {
-                        const entry = currentBranch?.entries.find(t => t.day === day && t.timeSlot === timeSlot)
-                        return (
-                          <td key={day} className="p-2">
-                            {entry ? (
-                              <motion.div
-                                className={`${entry.color} p-3 rounded-lg text-sm shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105`}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                <div className="font-bold text-sm">{entry.subject}</div>
-                                <div className="text-xs opacity-90 mt-1">{entry.teacher}</div>
-                                <div className="text-xs opacity-75 mt-1">{entry.room}</div>
-                              </motion.div>
-                            ) : (
-                              <div className="text-gray-600 text-center p-3">-</div>
-                            )}
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Enhanced Export Options */}
-            <div className="text-center space-y-4">
-              <h3 className="text-lg font-semibold text-white">Export Current Timetable</h3>
-              <p className="text-gray-400 text-sm">
-                Exporting: {currentBranch?.branchName} ({currentBranch?.entries.length} classes)
-              </p>
-              <div className="flex justify-center space-x-4 flex-wrap gap-2">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => exportTimetable('png')}
-                  disabled={isExporting}
-                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 font-semibold shadow-lg disabled:opacity-50"
-                >
-                  <Image className="w-5 h-5" />
-                  <span>{isExporting ? 'Exporting...' : 'Export PNG'}</span>
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => exportTimetable('pdf')}
-                  disabled={isExporting}
-                  className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 font-semibold shadow-lg disabled:opacity-50"
-                >
-                  <FileText className="w-5 h-5" />
-                  <span>{isExporting ? 'Exporting...' : 'Export PDF'}</span>
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => exportTimetable('excel')}
-                  disabled={isExporting}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 font-semibold shadow-lg disabled:opacity-50"
-                >
-                  <FileSpreadsheet className="w-5 h-5" />
-                  <span>{isExporting ? 'Exporting...' : 'Export Excel'}</span>
-                </motion.button>
-              </div>
-
-              {/* Start New Demo Button */}
-              <div className="mt-8">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    setCurrentStep(0)
-                    setBranchTimetables([])
-                    setCurrentBranchIndex(0)
-                    setFormData({
-                      collegeName: '',
-                      workingHours: 6,
-                      workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-                      maxClassHours: 25,
-                      numBranches: 1,
-                      numTeachers: 5,
-                      maxTeacherHours: 6,
-                      branches: [{ name: '', code: '' }],
-                      teachers: Array(5).fill(null).map(() => ({ name: '', code: '', subject: '' }))
-                    })
-                    toast.success('Started new demo!')
-                  }}
-                  className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg"
-                >
-                  <Sparkles className="w-5 h-5 inline mr-2" />
-                  Start New Demo
-                </motion.button>
-              </div>
+              {/* Timetable Table Rendering with only non-empty columns */}
+              {(() => {
+                // Find all time slots that are NOT empty for all days in this branch
+                const usedSlots = TIME_SLOTS.filter(slot =>
+                  formData.workingDays.some(day => {
+                    const entry = currentBranch.entries.find(e => e.day === day && e.timeSlot === slot)
+                    return entry && (entry.subject || entry.teacher || entry.room)
+                  })
+                )
+                // Always include lunch break slot if present
+                const lunchSlot = TIME_SLOTS.find(slot =>
+                  formData.workingDays.some(day => {
+                    const entry = currentBranch.entries.find(e => e.day === day && e.timeSlot === slot)
+                    return entry && entry.subject === 'Lunch Break'
+                  })
+                )
+                if (lunchSlot && !usedSlots.includes(lunchSlot)) usedSlots.push(lunchSlot)
+                // Sort slots in original order
+                const displaySlots = TIME_SLOTS.filter(slot => usedSlots.includes(slot))
+                return (
+                  <div id="timetable-display" className="overflow-x-auto w-full max-w-4xl mx-auto mt-4">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="square-cell bg-gray-900 text-white font-bold">Day / Time</th>
+                          {displaySlots.map((slot, idx) => (
+                            <th key={idx} className="square-cell bg-gray-900 text-white font-bold">{slot}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.workingDays.map((day, dayIdx) => (
+                          <tr key={dayIdx}>
+                            <td className="square-cell bg-gray-800 text-white font-semibold">{day}</td>
+                            {displaySlots.map((slot, slotIdx) => {
+                              const entry = currentBranch.entries.find(e => e.day === day && e.timeSlot === slot)
+                              if (entry) {
+                                if (entry.subject === 'Lunch Break') {
+                                  return (
+                                    <td key={slotIdx} className={`square-cell text-center font-bold ${simpleView ? 'bg-gray-200 text-gray-700' : SUBJECT_COLORS['Lunch Break']}`}>Lunch Break</td>
+                                  )
+                                }
+                                return (
+                                  <td key={slotIdx} className={`square-cell text-center ${simpleView ? 'bg-white text-gray-900 border border-gray-300' : entry.color || 'bg-gray-700 text-white'}`}>
+                                    <div className="text-xs font-bold">{entry.subject}</div>
+                                    <div className="text-xs">{entry.teacher}</div>
+                                    <div className="text-xs">{entry.room}</div>
+                                  </td>
+                                )
+                              } else {
+                                return <td key={slotIdx} className="square-cell bg-gray-100"></td>
+                              }
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()}
             </div>
           </div>
-        )
+        );
 
       default:
         return null
     }
   }
 
+  // Add square-cell utility for square timetable cells
+  // (You may want to move this to a CSS/SCSS file in a real project)
+  if (typeof window !== 'undefined' && !document.getElementById('square-cell-style')) {
+    const style = document.createElement('style');
+    style.id = 'square-cell-style';
+    style.innerHTML = `
+      .square-cell {
+        border-radius: 0 !important;
+        min-width: 80px;
+        min-height: 60px;
+        height: 60px;
+        width: 80px;
+        vertical-align: middle;
+        box-shadow: 0 1px 2px 0 rgba(0,0,0,0.03);
+        transition: background 0.2s, color 0.2s;
+        font-size: 0.95rem;
+      }
+      .square-cell.bg-gray-900, .square-cell.bg-gray-800 {
+        background: #18181b !important;
+        color: #fff !important;
+      }
+      .square-cell.bg-gray-100 {
+        background: #f3f4f6 !important;
+        color: #18181b !important;
+      }
+      .square-cell.bg-white {
+        background: #fff !important;
+        color: #18181b !important;
+      }
+      .square-cell.bg-gray-200 {
+        background: #e5e7eb !important;
+        color: #18181b !important;
+      }
+      .square-cell.bg-gray-700 {
+        background: #374151 !important;
+        color: #fff !important;
+      }
+      .square-cell.bg-gray-300 {
+        background: #d1d5db !important;
+        color: #18181b !important;
+      }
+      .square-cell.bg-gray-600 {
+        background: #4b5563 !important;
+        color: #fff !important;
+      }
+      .square-cell.bg-gray-200.text-gray-700 {
+        color: #18181b !important;
+      }
+      .square-cell.font-bold {
+        font-weight: 700 !important;
+      }
+      .square-cell.text-xs { font-size: 0.85rem !important; }
+    `;
+    document.head.appendChild(style);
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-            Interactive Demo
-          </h1>
-          <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-            Experience our revolutionary points-based timetable generation system
-          </p>
-        </motion.div>
-
-        {/* Progress Steps */}
-        <div className="max-w-4xl mx-auto mb-8">
-          <div className="flex justify-between items-center">
-            {steps.map((step, index) => (
-              <div key={index} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  index <= currentStep ? 'bg-purple-600 text-white' : 'bg-gray-600 text-gray-400'
-                }`}>
-                  {index + 1}
-                </div>
-                <span className={`ml-2 text-sm ${
-                  index <= currentStep ? 'text-white' : 'text-gray-400'
-                }`}>
-                  {step}
-                </span>
-                {index < steps.length - 1 && (
-                  <ChevronRight className="w-4 h-4 text-gray-600 mx-2" />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="max-w-4xl mx-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="glass-card p-8"
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="glass-card p-8"
+          >
+            {renderStepContent()}
+          </motion.div>
+        </AnimatePresence>
+        {/* Navigation */}
+        {!isGenerating && (
+          <div className="flex justify-between mt-8">
+            <button
+              onClick={prevStep}
+              disabled={currentStep === 0}
+              className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 disabled:text-gray-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2"
             >
-              {renderStepContent()}
-            </motion.div>
-          </AnimatePresence>
+              <ChevronLeft className="w-4 h-4" />
+              <span>Previous</span>
+            </button>
 
-          {/* Navigation */}
-          {!isGenerating && (
-            <div className="flex justify-between mt-8">
+            {currentStep === 3 ? (
               <button
-                onClick={prevStep}
-                disabled={currentStep === 0}
-                className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 disabled:text-gray-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2"
+                onClick={generateTimetable}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2"
               >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Previous</span>
+                <Play className="w-4 h-4" />
+                <span>Generate Timetable</span>
               </button>
-
-              {currentStep === 3 ? (
-                <button
-                  onClick={generateTimetable}
-                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-lg flex items-center space-x-2"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>Generate Timetable</span>
-                </button>
-              ) : currentStep < 4 ? (
-                <button
-                  onClick={nextStep}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    setCurrentStep(0)
-                    setTimetable([])
-                    setFormData({
-                      collegeName: '',
-                      workingHours: 6,
-                      workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-                      maxClassHours: 25,
-                      numBranches: 1,
-                      numTeachers: 5,
-                      maxTeacherHours: 6,
-                      branches: [],
-                      teachers: []
-                    })
-                  }}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>Start New Demo</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+            ) : currentStep < 4 ? (
+              <button
+                onClick={nextStep}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setCurrentStep(0)
+                  setFormData({
+                    collegeName: '',
+                    collegeStartTime: '09:00',
+                    collegeEndTime: '17:00',
+                    lunchStartTime: '13:00',
+                    lunchEndTime: '14:00',
+                    workingHours: 6,
+                    workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+                    maxClassHours: 25,
+                    numBranches: 1,
+                    numTeachers: 5,
+                    maxTeacherHours: 6,
+                    branches: [{ name: '', code: '' }],
+                    teachers: Array(5).fill(null).map(() => ({ name: '', code: '', subject: '' }))
+                  })
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2"
+              >
+                <Play className="w-4 h-4" />
+                <span>Start New Demo</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

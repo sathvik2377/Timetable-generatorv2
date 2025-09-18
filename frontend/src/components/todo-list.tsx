@@ -22,7 +22,7 @@ export function TodoList({ className = '' }: TodoListProps) {
   const [todos, setTodos] = useState<TodoItem[]>([])
   const [newTodo, setNewTodo] = useState('')
   const [newDescription, setNewDescription] = useState('')
-  const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium')
+      const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium')
   const [newDueDate, setNewDueDate] = useState('')
   const [isAddingTodo, setIsAddingTodo] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -97,8 +97,8 @@ export function TodoList({ className = '' }: TodoListProps) {
   const completedCount = todos.filter(todo => todo.completed).length
   const activeCount = todos.filter(todo => !todo.completed).length
 
-  return (
-    <div className={`glass-card p-6 ${className}`}>
+      return (
+  <div className={`glass-card p-6 bg-gradient-to-br from-purple-100/60 via-white/60 to-violet-100/60 ${className}`}>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-xl font-bold text-primary mb-1">To-Do List</h3>
@@ -110,7 +110,7 @@ export function TodoList({ className = '' }: TodoListProps) {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsAddingTodo(true)}
-          className="p-2 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white rounded-lg transition-all shadow-lg"
+          className="glass-button p-2 rounded-lg"
         >
           <Plus className="w-5 h-5" />
         </motion.button>
