@@ -29,34 +29,25 @@ class Command(BaseCommand):
         )
     
     def handle(self, *args, **options):
-        if options['clear']:
-            self.stdout.write('Clearing existing data...')
-            self.clear_data()
-        
+        self.stdout.write('Clearing existing data...')
+        self.clear_data()
         self.stdout.write('Creating demo data...')
-        
         try:
             with transaction.atomic():
                 # Create users
                 admin_user = self.create_admin_user()
                 faculty_users = self.create_faculty_users()
                 student_users = self.create_student_users()
-                
                 # Create institution
                 institution = self.create_institution()
-                
                 # Create branches
                 branches = self.create_branches(institution)
-                
                 # Create subjects
                 subjects = self.create_subjects(branches)
-                
                 # Create rooms
                 rooms = self.create_rooms(institution)
-                
                 # Create teachers
                 teachers = self.create_teachers(institution, faculty_users, subjects, branches)
-                
                 # Create class groups
                 class_groups = self.create_class_groups(branches)
                 
@@ -396,25 +387,29 @@ class Command(BaseCommand):
                 # 3-4 sessions per day per class
                 daily_sessions = random.randint(3, 4)
                 used_slots = []
-                
                 for _ in range(daily_sessions):
                     # Pick a random time slot that hasn't been used
                     available_slots = [i for i in range(len(time_slots)) if i not in used_slots]
                     if not available_slots:
                         break
-                    
                     slot_index = random.choice(available_slots)
                     used_slots.append(slot_index)
                     start_time, end_time = time_slots[slot_index]
-                    
                     # Pick random subject, teacher, and room
                     subject = random.choice(subjects[:6])  # CSE subjects
                     teacher = random.choice(teachers)
                     room = random.choice(rooms[:4])  # Classrooms and labs
-                    
                     session_type = random.choice(['lecture', 'tutorial', 'practical'])
-                    
-                    session, created = TimetableSession.objects.get_or_create(
+                    # Avoid duplicate session creation
+                    exists = TimetableSession.objects.filter(
+                        timetable=timetable,
+                        day_of_week=day,
+                        start_time=start_time,
+                        class_group=class_group
+                    ).exists()
+                    if exists:
+                        continue
+                    session = TimetableSession.objects.create(
                         timetable=timetable,
                         subject=subject,
                         teacher=teacher,
@@ -423,14 +418,9 @@ class Command(BaseCommand):
                         day_of_week=day,
                         start_time=start_time,
                         end_time=end_time,
-                        defaults={
-                            'session_type': session_type
-                        }
+                        session_type=session_type
                     )
-                    
-                    if created:
-                        sessions.append(session)
-        
+                    sessions.append(session)
         return sessions
     
     def create_constraints(self, institution):

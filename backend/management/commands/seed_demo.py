@@ -79,9 +79,9 @@ class Command(BaseCommand):
         
         # Admin user
         admin, created = User.objects.get_or_create(
-            email='admin@demo.com',
+            email='admin@demo.local',
             defaults={
-                'username': 'admin',
+                'username': 'admin@demo.local',
                 'first_name': 'Admin',
                 'last_name': 'User',
                 'role': User.Role.ADMIN,
@@ -90,17 +90,17 @@ class Command(BaseCommand):
             }
         )
         if created:
-            admin.set_password('admin123')
+            admin.set_password('Admin@1234')
             admin.save()
         users['admin'] = admin
         
         # Faculty users
         faculty_data = [
-            ('Dr. John Smith', 'john.smith@demo.com', 'EMP001'),
-            ('Prof. Sarah Johnson', 'sarah.johnson@demo.com', 'EMP002'),
-            ('Dr. Michael Brown', 'michael.brown@demo.com', 'EMP003'),
-            ('Ms. Emily Davis', 'emily.davis@demo.com', 'EMP004'),
-            ('Dr. Robert Wilson', 'robert.wilson@demo.com', 'EMP005'),
+            ('Dr. John Smith', 'john.smith@demo.local', 'EMP001'),
+            ('Prof. Sarah Johnson', 'sarah.johnson@demo.local', 'EMP002'),
+            ('Dr. Michael Brown', 'michael.brown@demo.local', 'EMP003'),
+            ('Ms. Emily Davis', 'emily.davis@demo.local', 'EMP004'),
+            ('Dr. Robert Wilson', 'robert.wilson@demo.local', 'EMP005'),
         ]
         
         users['faculty'] = []
@@ -109,7 +109,7 @@ class Command(BaseCommand):
             user, created = User.objects.get_or_create(
                 email=email,
                 defaults={
-                    'username': email.split('@')[0],
+                    'username': email,
                     'first_name': first_name,
                     'last_name': last_name,
                     'role': User.Role.FACULTY,
@@ -117,15 +117,15 @@ class Command(BaseCommand):
                 }
             )
             if created:
-                user.set_password('faculty123')
+                user.set_password('Faculty@123')
                 user.save()
             users['faculty'].append(user)
         
         # Student user
         student, created = User.objects.get_or_create(
-            email='student@demo.com',
+            email='student@demo.local',
             defaults={
-                'username': 'student',
+                'username': 'student@demo.local',
                 'first_name': 'Student',
                 'last_name': 'User',
                 'role': User.Role.STUDENT,
@@ -133,7 +133,7 @@ class Command(BaseCommand):
             }
         )
         if created:
-            student.set_password('student123')
+            student.set_password('Student@123')
             student.save()
         users['student'] = student
         

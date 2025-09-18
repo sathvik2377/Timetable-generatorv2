@@ -20,6 +20,9 @@ import {
   FileSpreadsheet
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
+import * as XLSX from 'xlsx'
 
 interface FormData {
   collegeName: string
@@ -39,10 +42,45 @@ interface TimetableEntry {
   subject: string
   teacher: string
   room: string
+  branchId?: string
+  color?: string
+}
+
+interface BranchTimetable {
+  branchId: string
+  branchName: string
+  entries: TimetableEntry[]
 }
 
 const WORKING_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const TIME_SLOTS = ['9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-1:00', '2:00-3:00', '3:00-4:00', '4:00-5:00']
+
+const SUBJECT_COLORS: { [key: string]: string } = {
+  'Mathematics': 'bg-gradient-to-br from-blue-500 to-blue-600 text-white',
+  'Physics': 'bg-gradient-to-br from-green-500 to-green-600 text-white',
+  'Chemistry': 'bg-gradient-to-br from-orange-500 to-orange-600 text-white',
+  'Biology': 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white',
+  'English': 'bg-gradient-to-br from-purple-500 to-purple-600 text-white',
+  'Hindi': 'bg-gradient-to-br from-pink-500 to-pink-600 text-white',
+  'History': 'bg-gradient-to-br from-amber-500 to-amber-600 text-white',
+  'Geography': 'bg-gradient-to-br from-teal-500 to-teal-600 text-white',
+  'Computer Science': 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white',
+  'Economics': 'bg-gradient-to-br from-red-500 to-red-600 text-white',
+  'Political Science': 'bg-gradient-to-br from-cyan-500 to-cyan-600 text-white',
+  'Sociology': 'bg-gradient-to-br from-violet-500 to-violet-600 text-white',
+  'Psychology': 'bg-gradient-to-br from-rose-500 to-rose-600 text-white',
+  'Philosophy': 'bg-gradient-to-br from-slate-500 to-slate-600 text-white',
+  'Physical Education': 'bg-gradient-to-br from-lime-500 to-lime-600 text-white',
+  'Art': 'bg-gradient-to-br from-fuchsia-500 to-fuchsia-600 text-white',
+  'Music': 'bg-gradient-to-br from-yellow-500 to-yellow-600 text-white',
+  'Lunch Break': 'bg-gradient-to-br from-gray-400 to-gray-500 text-white'
+}
+
+const DEMO_SUBJECTS = [
+  'Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'Hindi',
+  'History', 'Geography', 'Computer Science', 'Economics', 'Political Science',
+  'Sociology', 'Psychology', 'Philosophy', 'Physical Education', 'Art', 'Music'
+]
 
 export default function DemoInteractivePage() {
   const [currentStep, setCurrentStep] = useState(0)
@@ -60,14 +98,32 @@ export default function DemoInteractivePage() {
     branches: [{ name: '', code: '' }],
     teachers: Array(5).fill(null).map(() => ({ name: '', code: '', subject: '' }))
   })
-  const [timetable, setTimetable] = useState<TimetableEntry[]>([])
+  const [branchTimetables, setBranchTimetables] = useState<BranchTimetable[]>([])
+  const [currentBranchIndex, setCurrentBranchIndex] = useState(0)
   const [validationError, setValidationError] = useState('')
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({})
+  const [isExporting, setIsExporting] = useState(false)
 
   // Initialize branches and teachers arrays when component mounts
   useEffect(() => {
     initializeArrays()
   }, [])
+
+  // Keyboard navigation for branch switching
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (currentStep === 4 && branchTimetables.length > 1) {
+        if (e.key === 'ArrowLeft' && currentBranchIndex > 0) {
+          setCurrentBranchIndex(currentBranchIndex - 1)
+        } else if (e.key === 'ArrowRight' && currentBranchIndex < branchTimetables.length - 1) {
+          setCurrentBranchIndex(currentBranchIndex + 1)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [currentStep, currentBranchIndex, branchTimetables.length])
 
   const initializeArrays = () => {
     setFormData(prev => ({
@@ -205,31 +261,48 @@ export default function DemoInteractivePage() {
     }))
   }
 
-  // Generate demo data
+  // Enhanced demo data generation that respects user-specified counts
   const generateDemoData = () => {
-    const demoData: FormData = {
+    const branchNames = [
+      'Computer Science Engineering', 'Electronics & Communication', 'Mechanical Engineering',
+      'Civil Engineering', 'Electrical Engineering', 'Chemical Engineering',
+      'Aerospace Engineering', 'Biotechnology', 'Information Technology', 'Automobile Engineering'
+    ]
+
+    const teacherNames = [
+      'Dr. Rajesh Kumar', 'Prof. Priya Sharma', 'Dr. Amit Singh', 'Ms. Neha Gupta', 'Prof. Suresh Patel',
+      'Dr. Kavita Jain', 'Mr. Ravi Verma', 'Prof. Sunita Rao', 'Dr. Manoj Tiwari', 'Ms. Pooja Agarwal',
+      'Prof. Vikash Yadav', 'Dr. Rekha Mishra', 'Mr. Deepak Joshi', 'Prof. Anita Kumari', 'Dr. Sanjay Pandey',
+      'Ms. Shweta Singh', 'Prof. Rahul Gupta', 'Dr. Meera Patel', 'Mr. Arjun Sharma', 'Prof. Divya Rao',
+      'Dr. Kiran Joshi', 'Ms. Nisha Verma', 'Prof. Rohit Kumar', 'Dr. Seema Agarwal', 'Mr. Ajay Tiwari',
+      'Prof. Ritu Mishra', 'Dr. Vinod Yadav', 'Ms. Preeti Jain', 'Prof. Sachin Pandey', 'Dr. Geeta Kumari',
+      'Mr. Nitin Singh', 'Prof. Madhuri Sharma', 'Dr. Anil Gupta', 'Ms. Swati Patel', 'Prof. Manish Rao',
+      'Dr. Sunita Joshi', 'Mr. Rakesh Verma', 'Prof. Kavya Kumar', 'Dr. Sunil Agarwal', 'Ms. Priyanka Tiwari',
+      'Prof. Deepika Mishra', 'Dr. Ashok Yadav', 'Ms. Renu Jain', 'Prof. Vikas Pandey', 'Dr. Sushma Kumari',
+      'Mr. Rajiv Singh', 'Prof. Neelam Sharma', 'Dr. Mukesh Gupta', 'Ms. Anjali Patel', 'Prof. Sudhir Rao'
+    ]
+
+    // Generate branches based on user-specified count
+    const demoBranches = Array(formData.numBranches).fill(null).map((_, i) => ({
+      name: branchNames[i] || `Branch ${i + 1}`,
+      code: branchNames[i] ? branchNames[i].split(' ').map(word => word[0]).join('') : `BR${i + 1}`
+    }))
+
+    // Generate teachers based on user-specified count
+    const demoTeachers = Array(formData.numTeachers).fill(null).map((_, i) => ({
+      name: teacherNames[i] || `Teacher ${i + 1}`,
+      code: `T${String(i + 1).padStart(3, '0')}`,
+      subject: DEMO_SUBJECTS[i % DEMO_SUBJECTS.length]
+    }))
+
+    setFormData(prev => ({
+      ...prev,
       collegeName: 'Smart India Institute of Technology',
-      workingHours: 6,
-      workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-      maxClassHours: 30,
-      numBranches: 2,
-      numTeachers: 6,
-      maxTeacherHours: 5,
-      branches: [
-        { name: 'Computer Science Engineering', code: 'CSE' },
-        { name: 'Information Technology', code: 'IT' }
-      ],
-      teachers: [
-        { name: 'Dr. Rajesh Kumar', code: 'T001', subject: 'Data Structures' },
-        { name: 'Prof. Priya Sharma', code: 'T002', subject: 'Database Systems' },
-        { name: 'Dr. Amit Singh', code: 'T003', subject: 'Computer Networks' },
-        { name: 'Ms. Neha Gupta', code: 'T004', subject: 'Software Engineering' },
-        { name: 'Dr. Suresh Patel', code: 'T005', subject: 'Operating Systems' },
-        { name: 'Prof. Kavita Jain', code: 'T006', subject: 'Web Development' }
-      ]
-    }
-    setFormData(demoData)
-    toast.success('Demo data loaded successfully!')
+      branches: demoBranches,
+      teachers: demoTeachers
+    }))
+
+    toast.success(`Generated demo data for ${formData.numBranches} branches and ${formData.numTeachers} teachers!`)
   }
 
   // Enhanced timetable generation with better progress tracking
@@ -260,78 +333,184 @@ export default function DemoInteractivePage() {
         await new Promise(resolve => setTimeout(resolve, delay))
       }
 
-      // Generate actual timetable using enhanced points system
-      const newTimetable: TimetableEntry[] = []
-      const teacherPoints: { [key: string]: number } = {}
-      const teacherWorkload: { [key: string]: number } = {}
+      // Generate timetables for all branches using enhanced points system
+      const newBranchTimetables: BranchTimetable[] = []
 
-      // Initialize teacher points and workload tracking
-      formData.teachers.forEach(teacher => {
-        if (teacher.code && teacher.name) {
-          teacherPoints[teacher.code] = formData.maxTeacherHours * 100 * formData.workingDays.length
-          teacherWorkload[teacher.code] = 0
-        }
-      })
+      for (let branchIndex = 0; branchIndex < formData.branches.length; branchIndex++) {
+        const branch = formData.branches[branchIndex]
+        const branchTimetable: TimetableEntry[] = []
 
-      // Generate schedule for first branch with better distribution
-      const branch = formData.branches[0]
-      let hoursScheduled = 0
-      const targetHours = formData.maxClassHours
-      const dailyHoursLimit = Math.ceil(targetHours / formData.workingDays.length)
+        // Reset teacher points for each branch
+        const teacherPoints: { [key: string]: number } = {}
+        const teacherWorkload: { [key: string]: number } = {}
 
-      for (const day of formData.workingDays) {
-        let dailyHours = 0
+        // Initialize teacher points and workload tracking
+        formData.teachers.forEach(teacher => {
+          if (teacher.code && teacher.name) {
+            teacherPoints[teacher.code] = formData.maxTeacherHours * 100 * formData.workingDays.length
+            teacherWorkload[teacher.code] = 0
+          }
+        })
 
-        for (const timeSlot of TIME_SLOTS.slice(0, formData.workingHours)) {
-          if (hoursScheduled >= targetHours || dailyHours >= dailyHoursLimit) break
+        let hoursScheduled = 0
+        const targetHours = formData.maxClassHours
+        const dailyHoursLimit = Math.ceil(targetHours / formData.workingDays.length)
 
-          // Find available teacher with points, prioritizing balanced workload
-          const availableTeachers = formData.teachers.filter(teacher =>
-            teacher.code && teacherPoints[teacher.code] >= 100
-          ).sort((a, b) => teacherWorkload[a.code] - teacherWorkload[b.code])
+        // Generate unique schedule for each branch
+        for (const day of formData.workingDays) {
+          let dailyHours = 0
 
-          const selectedTeacher = availableTeachers[0]
+          for (const timeSlot of TIME_SLOTS.slice(0, formData.workingHours)) {
+            if (hoursScheduled >= targetHours || dailyHours >= dailyHoursLimit) break
 
-          if (selectedTeacher) {
-            teacherPoints[selectedTeacher.code] -= 100
-            teacherWorkload[selectedTeacher.code]++
+            // Add some randomization to create different schedules per branch
+            const shuffledTeachers = [...formData.teachers]
+              .filter(teacher => teacher.code && teacherPoints[teacher.code] >= 100)
+              .sort((a, b) => {
+                // Add branch-specific randomization
+                const randomFactor = (branchIndex + 1) * Math.sin(hoursScheduled + branchIndex)
+                return (teacherWorkload[a.code] + randomFactor) - (teacherWorkload[b.code] + randomFactor)
+              })
 
-            newTimetable.push({
-              day,
-              timeSlot,
-              subject: selectedTeacher.subject,
-              teacher: selectedTeacher.name,
-              room: `Room ${Math.floor(Math.random() * 10) + 101}`
-            })
-            hoursScheduled++
-            dailyHours++
+            const selectedTeacher = shuffledTeachers[0]
+
+            if (selectedTeacher) {
+              teacherPoints[selectedTeacher.code] -= 100
+              teacherWorkload[selectedTeacher.code]++
+
+              branchTimetable.push({
+                day,
+                timeSlot,
+                subject: selectedTeacher.subject,
+                teacher: selectedTeacher.name,
+                room: `Room ${Math.floor(Math.random() * 20) + 101}`,
+                branchId: branch.code,
+                color: SUBJECT_COLORS[selectedTeacher.subject] || 'bg-gradient-to-br from-gray-500 to-gray-600 text-white'
+              })
+              hoursScheduled++
+              dailyHours++
+            }
           }
         }
-      }
 
-      // Add lunch break if needed
-      if (formData.workingHours > 4) {
-        const lunchSlot = TIME_SLOTS[Math.floor(formData.workingHours / 2)]
-        formData.workingDays.forEach(day => {
-          newTimetable.push({
-            day,
-            timeSlot: lunchSlot,
-            subject: 'Lunch Break',
-            teacher: '',
-            room: 'Cafeteria'
+        // Add lunch break if needed
+        if (formData.workingHours > 4) {
+          const lunchSlot = TIME_SLOTS[Math.floor(formData.workingHours / 2)]
+          formData.workingDays.forEach(day => {
+            branchTimetable.push({
+              day,
+              timeSlot: lunchSlot,
+              subject: 'Lunch Break',
+              teacher: '',
+              room: 'Cafeteria',
+              branchId: branch.code,
+              color: SUBJECT_COLORS['Lunch Break']
+            })
           })
+        }
+
+        newBranchTimetables.push({
+          branchId: branch.code,
+          branchName: branch.name,
+          entries: branchTimetable
         })
       }
 
-      setTimetable(newTimetable)
+      setBranchTimetables(newBranchTimetables)
+      setCurrentBranchIndex(0)
       setIsGenerating(false)
       setCurrentStep(4)
-      toast.success(`Timetable generated successfully! ${hoursScheduled} classes scheduled.`)
+      toast.success(`Generated ${newBranchTimetables.length} unique timetables successfully!`)
 
     } catch (error) {
       console.error('Generation error:', error)
       setIsGenerating(false)
       toast.error('Failed to generate timetable. Please try again.')
+    }
+  }
+
+  // Export functionality
+  const exportTimetable = async (format: 'png' | 'pdf' | 'excel') => {
+    if (branchTimetables.length === 0) {
+      toast.error('No timetable to export!')
+      return
+    }
+
+    setIsExporting(true)
+    const currentBranch = branchTimetables[currentBranchIndex]
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+    const filename = `${currentBranch.branchName.replace(/\s+/g, '_')}_Timetable_${timestamp}`
+
+    try {
+      if (format === 'png') {
+        const timetableElement = document.getElementById('timetable-display')
+        if (timetableElement) {
+          const canvas = await html2canvas(timetableElement, {
+            backgroundColor: '#1f2937',
+            scale: 2,
+            logging: false
+          })
+
+          const link = document.createElement('a')
+          link.download = `${filename}.png`
+          link.href = canvas.toDataURL()
+          link.click()
+
+          toast.success('PNG exported successfully!')
+        }
+      } else if (format === 'pdf') {
+        const timetableElement = document.getElementById('timetable-display')
+        if (timetableElement) {
+          const canvas = await html2canvas(timetableElement, {
+            backgroundColor: '#1f2937',
+            scale: 2,
+            logging: false
+          })
+
+          const pdf = new jsPDF('l', 'mm', 'a4')
+          const imgData = canvas.toDataURL('image/png')
+          const imgWidth = 297
+          const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+          pdf.save(`${filename}.pdf`)
+
+          toast.success('PDF exported successfully!')
+        }
+      } else if (format === 'excel') {
+        const worksheetData = []
+
+        // Add header
+        worksheetData.push([
+          `${currentBranch.branchName} Timetable`,
+          '', '', '', '', ''
+        ])
+        worksheetData.push(['Day', 'Time', 'Subject', 'Teacher', 'Room', ''])
+
+        // Add timetable data
+        currentBranch.entries.forEach(entry => {
+          worksheetData.push([
+            entry.day,
+            entry.timeSlot,
+            entry.subject,
+            entry.teacher,
+            entry.room,
+            ''
+          ])
+        })
+
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
+        const workbook = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Timetable')
+
+        XLSX.writeFile(workbook, `${filename}.xlsx`)
+        toast.success('Excel file exported successfully!')
+      }
+    } catch (error) {
+      console.error('Export error:', error)
+      toast.error('Failed to export timetable. Please try again.')
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -759,41 +938,77 @@ export default function DemoInteractivePage() {
         )
 
       case 4:
+        const currentBranch = branchTimetables[currentBranchIndex]
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
               <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white">Timetable Generated Successfully!</h2>
-              <p className="text-gray-400">Branch: {formData.branches[0]?.name || 'First Branch'}</p>
+              <h2 className="text-2xl font-bold text-white">Timetables Generated Successfully!</h2>
+              <p className="text-gray-400">Generated {branchTimetables.length} unique timetables</p>
             </div>
 
-            {/* Timetable Display */}
-            <div className="overflow-x-auto">
-              <table className="w-full bg-gray-800/50 rounded-lg overflow-hidden">
+            {/* Branch Navigation */}
+            {branchTimetables.length > 1 && (
+              <div className="flex items-center justify-center space-x-4 mb-6">
+                <button
+                  onClick={() => setCurrentBranchIndex(Math.max(0, currentBranchIndex - 1))}
+                  disabled={currentBranchIndex === 0}
+                  className="p-2 rounded-lg bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-white">{currentBranch?.branchName}</h3>
+                  <p className="text-gray-400 text-sm">
+                    Branch {currentBranchIndex + 1} of {branchTimetables.length}
+                  </p>
+                  <p className="text-purple-400 text-xs mt-1">
+                    Use ← → arrow keys to navigate
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setCurrentBranchIndex(Math.min(branchTimetables.length - 1, currentBranchIndex + 1))}
+                  disabled={currentBranchIndex === branchTimetables.length - 1}
+                  className="p-2 rounded-lg bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-purple-700 transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+
+            {/* Enhanced Timetable Display with Colors */}
+            <div id="timetable-display" className="overflow-x-auto bg-gray-900 p-4 rounded-lg">
+              <table className="w-full bg-gray-800/50 rounded-lg overflow-hidden shadow-2xl">
                 <thead>
-                  <tr className="bg-purple-600">
-                    <th className="p-3 text-left text-white">Time</th>
+                  <tr className="bg-gradient-to-r from-purple-600 to-violet-600">
+                    <th className="p-4 text-left text-white font-bold">Time</th>
                     {formData.workingDays.map(day => (
-                      <th key={day} className="p-3 text-left text-white">{day}</th>
+                      <th key={day} className="p-4 text-left text-white font-bold">{day}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {TIME_SLOTS.slice(0, formData.workingHours).map(timeSlot => (
-                    <tr key={timeSlot} className="border-b border-gray-700">
-                      <td className="p-3 text-white font-semibold">{timeSlot}</td>
+                    <tr key={timeSlot} className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors">
+                      <td className="p-4 text-white font-semibold bg-gray-800">{timeSlot}</td>
                       {formData.workingDays.map(day => {
-                        const entry = timetable.find(t => t.day === day && t.timeSlot === timeSlot)
+                        const entry = currentBranch?.entries.find(t => t.day === day && t.timeSlot === timeSlot)
                         return (
-                          <td key={day} className="p-3">
+                          <td key={day} className="p-2">
                             {entry ? (
-                              <div className="bg-blue-500/20 p-2 rounded text-sm">
-                                <div className="text-blue-400 font-semibold">{entry.subject}</div>
-                                <div className="text-gray-400">{entry.teacher}</div>
-                                <div className="text-gray-500">{entry.room}</div>
-                              </div>
+                              <motion.div
+                                className={`${entry.color} p-3 rounded-lg text-sm shadow-lg hover:shadow-xl transition-all cursor-pointer transform hover:scale-105`}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <div className="font-bold text-sm">{entry.subject}</div>
+                                <div className="text-xs opacity-90 mt-1">{entry.teacher}</div>
+                                <div className="text-xs opacity-75 mt-1">{entry.room}</div>
+                              </motion.div>
                             ) : (
-                              <div className="text-gray-600 text-center">-</div>
+                              <div className="text-gray-600 text-center p-3">-</div>
                             )}
                           </td>
                         )
@@ -804,31 +1019,74 @@ export default function DemoInteractivePage() {
               </table>
             </div>
 
-            {/* Export Options */}
+            {/* Enhanced Export Options */}
             <div className="text-center space-y-4">
-              <h3 className="text-lg font-semibold text-white">Export Options</h3>
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={exportToPNG}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+              <h3 className="text-lg font-semibold text-white">Export Current Timetable</h3>
+              <p className="text-gray-400 text-sm">
+                Exporting: {currentBranch?.branchName} ({currentBranch?.entries.length} classes)
+              </p>
+              <div className="flex justify-center space-x-4 flex-wrap gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => exportTimetable('png')}
+                  disabled={isExporting}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 font-semibold shadow-lg disabled:opacity-50"
                 >
-                  <Image className="w-4 h-4" />
-                  <span>PNG</span>
-                </button>
-                <button
-                  onClick={exportToPDF}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+                  <Image className="w-5 h-5" />
+                  <span>{isExporting ? 'Exporting...' : 'Export PNG'}</span>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => exportTimetable('pdf')}
+                  disabled={isExporting}
+                  className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 font-semibold shadow-lg disabled:opacity-50"
                 >
-                  <FileText className="w-4 h-4" />
-                  <span>PDF</span>
-                </button>
-                <button
-                  onClick={exportToExcel}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+                  <FileText className="w-5 h-5" />
+                  <span>{isExporting ? 'Exporting...' : 'Export PDF'}</span>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => exportTimetable('excel')}
+                  disabled={isExporting}
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 font-semibold shadow-lg disabled:opacity-50"
                 >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Excel</span>
-                </button>
+                  <FileSpreadsheet className="w-5 h-5" />
+                  <span>{isExporting ? 'Exporting...' : 'Export Excel'}</span>
+                </motion.button>
+              </div>
+
+              {/* Start New Demo Button */}
+              <div className="mt-8">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setCurrentStep(0)
+                    setBranchTimetables([])
+                    setCurrentBranchIndex(0)
+                    setFormData({
+                      collegeName: '',
+                      workingHours: 6,
+                      workingDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+                      maxClassHours: 25,
+                      numBranches: 1,
+                      numTeachers: 5,
+                      maxTeacherHours: 6,
+                      branches: [{ name: '', code: '' }],
+                      teachers: Array(5).fill(null).map(() => ({ name: '', code: '', subject: '' }))
+                    })
+                    toast.success('Started new demo!')
+                  }}
+                  className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white px-8 py-3 rounded-lg font-semibold shadow-lg"
+                >
+                  <Sparkles className="w-5 h-5 inline mr-2" />
+                  Start New Demo
+                </motion.button>
               </div>
             </div>
           </div>

@@ -28,8 +28,8 @@ export default function LoginPage() {
   useEffect(() => {
     const defaultCredentials = {
       admin: { email: 'admin@demo.local', password: 'Admin@1234' },
-      faculty: { email: 'faculty@demo.local', password: 'Faculty@123' },
-      student: { email: 'student@demo.local', password: 'Student@123' }
+      faculty: { email: 'faculty1@demo.local', password: 'Faculty@123' },
+      student: { email: 'student1@demo.local', password: 'Student@123' }
     }
 
     const defaults = defaultCredentials[role as keyof typeof defaultCredentials] || defaultCredentials.admin
@@ -76,6 +76,9 @@ export default function LoginPage() {
 
     } catch (error: any) {
       console.error('Login error:', error)
+      if (error.response) {
+        console.log('Backend error response:', error.response.data)
+      }
       const errorMessage = error.response?.data?.message ||
         error.response?.data?.error ||
         'Login failed. Please check your credentials.'

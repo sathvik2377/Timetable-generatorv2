@@ -62,6 +62,8 @@ echo.
 echo Backend: http://localhost:8000
 echo Admin Panel: http://localhost:8000/admin
 echo Login: admin@demo.local / Admin@1234
+echo Faculty: faculty1@demo.local / Faculty@123
+echo Student: student1@demo.local / Student@123
 echo.
 
 echo Starting Django backend...
@@ -88,6 +90,8 @@ echo NEP-2020 Timetable Generator is running!
 echo ========================================
 echo Backend: http://localhost:8000
 echo Admin: http://localhost:8000/admin (admin@demo.local/Admin@1234)
+echo Faculty: faculty1@demo.local / Faculty@123
+echo Student: student1@demo.local / Student@123
 echo Frontend: http://localhost:3000
 echo.
 echo All 9 setup modes are available in the admin dashboard

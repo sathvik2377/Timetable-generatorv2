@@ -82,8 +82,8 @@ export function TodoList({ className = '' }: TodoListProps) {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high': return 'text-red-400 border-red-400'
-      case 'medium': return 'text-yellow-400 border-yellow-400'
-      case 'low': return 'text-blue-400 border-blue-400'
+      case 'medium': return 'text-amber-400 border-amber-400'
+      case 'low': return 'text-purple-400 border-purple-400'
       default: return 'text-gray-400 border-gray-400'
     }
   }
@@ -110,7 +110,7 @@ export function TodoList({ className = '' }: TodoListProps) {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsAddingTodo(true)}
-          className="glass-button p-2 rounded-lg"
+          className="p-2 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white rounded-lg transition-all shadow-lg"
         >
           <Plus className="w-5 h-5" />
         </motion.button>
@@ -179,7 +179,7 @@ export function TodoList({ className = '' }: TodoListProps) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={addTodo}
-                className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+                className="flex-1 py-2 px-4 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white rounded-lg font-medium transition-all shadow-lg"
               >
                 Add Task
               </motion.button>
