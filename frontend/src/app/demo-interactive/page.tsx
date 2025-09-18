@@ -595,11 +595,17 @@ export default function DemoInteractivePage() {
           })
 
           const pdf = new jsPDF('l', 'mm', 'a4')
+          // Add branch name heading before timetable image
+          pdf.setFontSize(20)
+          pdf.setTextColor(40, 40, 40)
+          pdf.text(`Timetable for ${currentBranch.branchName}`, 15, 20)
+
           const imgData = canvas.toDataURL('image/png')
           const imgWidth = 297
           const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-          pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+          // Place image a bit lower to make space for heading
+          pdf.addImage(imgData, 'PNG', 0, 25, imgWidth, imgHeight)
           pdf.save(`${filename}.pdf`)
 
           toast.success('PDF exported successfully!')
@@ -1220,6 +1226,11 @@ export default function DemoInteractivePage() {
                 const displaySlots = TIME_SLOTS.filter(slot => usedSlots.includes(slot))
                 return (
                   <div id="timetable-display" className="overflow-x-auto w-full max-w-4xl mx-auto mt-4">
+                    <div className="mb-2 text-center">
+                      <h2 className="text-xl font-bold text-gray-900 bg-white rounded-t-lg py-2 border-b-2 border-gray-300">
+                        Timetable for {currentBranch.branchName}
+                      </h2>
+                    </div>
                     <table className="w-full border-collapse">
                       <thead>
                         <tr>
