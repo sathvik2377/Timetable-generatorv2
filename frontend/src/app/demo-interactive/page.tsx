@@ -150,11 +150,11 @@ export default function DemoInteractivePage() {
   }
 
   const steps = [
-    "Institution Setup",
-    "Resource Planning", 
-    "Branch & Teacher Details",
-    "Validation & Generation",
-    "Timetable Result"
+  "Institution Setup",
+  "Resource Planning", 
+  "Details Entry",
+  "Validation & Generation",
+  "Timetable Result"
   ]
 
   const generationSteps = [
@@ -1327,6 +1327,51 @@ export default function DemoInteractivePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <div className="container mx-auto px-4 py-8">
+        {/* Top Navigation and Progress Bar */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => window.location.href = '/'}
+              className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-semibold shadow"
+            >
+              ← Back to Home
+            </button>
+            <button
+              onClick={() => window.open('/nep-2020', '_blank')}
+              className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-lg font-semibold shadow"
+            >
+              NEP 2020
+            </button>
+            <button
+              onClick={() => window.open('/about', '_blank')}
+              className="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-4 py-2 rounded-lg font-semibold shadow"
+            >
+              About
+            </button>
+            <button
+              onClick={() => window.open('/how-to-use', '_blank')}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-semibold shadow"
+            >
+              How to Use
+            </button>
+          </div>
+          {/* Step Progress Bar */}
+          <div className="flex items-end gap-2 w-full md:w-auto mt-2 md:mt-0">
+            {steps.map((step, idx) => (
+              <div key={idx} className="flex flex-col items-center gap-1 min-w-[64px]">
+                <div className="flex items-center gap-0.5">
+                  <div className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm border-2 transition-all duration-300
+                    ${idx < currentStep ? 'bg-green-500 border-green-500 text-white' : idx === currentStep ? 'bg-purple-600 border-purple-400 text-white' : 'bg-gray-800 border-gray-600 text-gray-400'}`}>{idx + 1}</div>
+                  {idx < steps.length - 1 && (
+                    <div className={`h-1 w-8 md:w-12 rounded transition-all duration-300
+                      ${idx < currentStep ? 'bg-green-500' : 'bg-gray-700'}`}></div>
+                  )}
+                </div>
+                <span className={`text-base md:text-lg text-center max-w-[100px] min-h-[48px] flex items-center justify-center font-semibold ${idx === currentStep ? 'text-purple-400' : idx < currentStep ? 'text-green-500' : 'text-gray-400'}`}>{step}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}
