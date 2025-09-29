@@ -26,10 +26,11 @@ export default function LoginPage() {
 
   // Set default credentials based on role
   useEffect(() => {
+
     const defaultCredentials = {
       admin: { email: 'admin@demo.local', password: 'Admin@1234' },
-      faculty: { email: 'faculty1@demo.local', password: 'Faculty@123' },
-      student: { email: 'student1@demo.local', password: 'Student@123' }
+      faculty: { email: 'john.smith@demo.local', password: 'Faculty@123' },
+      student: { email: 'student@demo.local', password: 'Student@123' }
     }
 
     const defaults = defaultCredentials[role as keyof typeof defaultCredentials] || defaultCredentials.admin
